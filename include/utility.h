@@ -67,6 +67,10 @@ public:
 
     std::string robot_id;
 
+    // Debug
+    bool isDebug;
+    std::string debugPath;
+
     //Topics
     string pointCloudTopic;
     string imuTopic;
@@ -153,6 +157,11 @@ public:
     ParamServer()
     {
         nh.param<std::string>("/robot_id", robot_id, "roboat");
+
+        // DEBUG 参数
+        nh.param<bool>("lio_sam/isDebug", isDebug, false);
+        nh.param<std::string>("lio_sam/debugPath", debugPath, "/home/lab-307/LIO-SAM_ws/src/Scout-LIO");
+
 
         nh.param<std::string>("lio_sam/pointCloudTopic", pointCloudTopic, "points_raw");
         nh.param<std::string>("lio_sam/imuTopic", imuTopic, "imu_correct");

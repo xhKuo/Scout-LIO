@@ -1,10 +1,14 @@
 lio_sam:
 
+  # isDebug
+  isDebug: true      # 如果开启debug，设为true 日志生成在文件路径的 LOG文件夹下
+  debugPath: "/home/lab-307/LIO-SAM_ws/src/Scout-LIO"
+
   # Topics
   pointCloudTopic: "/velodyne_points"               # Point cloud data
   imuTopic: "/imu/data"                         # IMU data
   odomTopic: "odometry/imu"                   # IMU pre-preintegration odometry, same frequency as IMU
-  gpsTopic: "odometry/gps"                 # GPS odometry topic from navsat, see module_navsat.launch file
+  gpsTopic: "odometry/gpsa"                 # GPS odometry topic from navsat, see module_navsat.launch file
 
   # Frames
   lidarFrame: "base_link"
@@ -101,7 +105,7 @@ navsat:
   wait_for_datum: false
   delay: 0.0
   magnetic_declination_radians: 0
-  yaw_offset: 0
+  yaw_offset: 90
   zero_altitude: true
   broadcast_utm_transform: false
   broadcast_utm_transform_as_parent_frame: false

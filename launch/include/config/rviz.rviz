@@ -467,8 +467,7 @@ Visualization Manager:
           Marker Topic: /lio_sam/mapping/loop_closure_constraints
           Name: Loop constraint
           Namespaces:
-            loop_edges: true
-            loop_nodes: true
+            {}
           Queue Size: 100
           Value: true
       Enabled: true
@@ -507,25 +506,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 534.262207
+      Distance: 116.276749
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 6.85028744
-        Y: 35.056282
-        Z: -17.1568527
+        X: 13.2621489
+        Y: -3.59868431
+        Z: -31.9887276
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.984796882
+      Pitch: 1.21979666
       Target Frame: base_link
       Value: Orbit (rviz)
-      Yaw: 3.91279507
+      Yaw: 3.70279074
     Saved: ~
 Window Geometry:
   Displays:
@@ -541,5 +540,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1825
-  X: 429
-  Y: 298
+  X: 389
+  Y: 337
