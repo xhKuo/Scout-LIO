@@ -1,5 +1,0 @@
-Log file created at: 2021/10/27 21:59:30
-Running on machine: lab-307
-Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
-I1027 21:59:30.587909 19477 featureExtraction.cpp:396] -------> Feature Extraction Started.
-I1027 21:59:30.588219 19477 featureExtraction.cpp:402] 初始化用时: 291.511毫秒
