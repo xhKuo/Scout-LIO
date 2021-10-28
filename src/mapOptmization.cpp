@@ -1886,17 +1886,17 @@ public:
             ROS_INFO_STREAM("cloudKeyPoses3D->points.empty()");
             return;
         } else {
-            if (pointDistance(cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0){
+            if (pointDistance(cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 1.0){
                 ROS_INFO_STREAM("cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0");
                 return;
             }
         }
 
         //// 位姿协方差很小，没必要加入GPS数据进行校正
-        if (poseCovariance(3,3) < poseCovThreshold && poseCovariance(4,4) < poseCovThreshold){
-            ROS_INFO_STREAM("poseCovariance(3,3) < poseCovThreshold && poseCovariance(4,4) < poseCovThreshold");
-            return;
-        }
+//        if (poseCovariance(3,3) < poseCovThreshold && poseCovariance(4,4) < poseCovThreshold){
+//            ROS_INFO_STREAM("poseCovariance(3,3) < poseCovThreshold && poseCovariance(4,4) < poseCovThreshold");
+//            return;
+//        }
 
 
         static PointType lastGPSPoint;
@@ -1942,7 +1942,6 @@ public:
                 if (abs(gps_x) < 1e-6 && abs(gps_y) < 1e-6){
                     ROS_INFO_STREAM("data is (0,0,0), rejected !!");
                     continue;
-
                 }
 
                 // 每隔5m添加一个GPS里程计
@@ -1950,7 +1949,7 @@ public:
                 curGPSPoint.x = gps_x;
                 curGPSPoint.y = gps_y;
                 curGPSPoint.z = gps_z;
-                if (pointDistance(curGPSPoint, lastGPSPoint) < 5.0){
+                if (pointDistance(curGPSPoint, lastGPSPoint) < 1.0){
                     ROS_INFO_STREAM("distance is less than 5.0m !!");
                     continue;
                 } else {
@@ -1959,7 +1958,8 @@ public:
 
                 // 添加GPS因子
                 gtsam::Vector Vector3(3);
-                Vector3 << max(noise_x, 1.0f), max(noise_y, 1.0f), max(noise_z, 1.0f);
+//                Vector3 << max(noise_x, 1.0f), max(noise_y, 1.0f), max(noise_z, 1.0f);
+                Vector3 << noise_x*10, noise_y*10, noise_z*10;
                 noiseModel::Diagonal::shared_ptr gps_noise = noiseModel::Diagonal::Variances(Vector3);
                 gtsam::GPSFactor gps_factor(cloudKeyPoses3D->size(), gtsam::Point3(gps_x, gps_y, gps_z), gps_noise);
                 gtSAMgraph.add(gps_factor);
