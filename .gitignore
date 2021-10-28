@@ -9,9 +9,5 @@
 build/
 cmake-build-debug/
 .idea/
-<<<<<<< HEAD
-Log/
-=======
 Log/
 
->>>>>>> dev_zqg
