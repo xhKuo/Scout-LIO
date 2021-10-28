@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /links1
         - /Odometry1
+        - /Odometry1/Odom IMU1
         - /Odometry1/Odom GPS1
         - /Point Cloud1
         - /Feature Cloud1
@@ -79,8 +80,8 @@ Visualization Manager:
               Scale: 1
               Value: true
             Value: false
-          Enabled: false
-          Keep: 300
+          Enabled: true
+          Keep: 30000
           Name: Odom IMU
           Position Tolerance: 0.100000001
           Shape:
@@ -95,7 +96,7 @@ Visualization Manager:
             Value: Axes
           Topic: /odometry/imu
           Unreliable: false
-          Value: false
+          Value: true
         - Angle Tolerance: 0.100000001
           Class: rviz/Odometry
           Covariance:
@@ -113,8 +114,8 @@ Visualization Manager:
               Scale: 1
               Value: true
             Value: false
-          Enabled: false
-          Keep: 300
+          Enabled: true
+          Keep: 30000
           Name: Odom GPS
           Position Tolerance: 0.100000001
           Shape:
@@ -129,7 +130,7 @@ Visualization Manager:
             Value: Axes
           Topic: /odometry/gps
           Unreliable: false
-          Value: false
+          Value: true
         - Angle Tolerance: 0.100000001
           Class: rviz/Odometry
           Covariance:
@@ -506,25 +507,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 116.276749
+      Distance: 98.5933685
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 13.2621489
-        Y: -3.59868431
-        Z: -31.9887276
+        X: 43.329052
+        Y: -54.9212494
+        Z: -31.9515915
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 1.21979666
+      Pitch: 1.56979632
       Target Frame: base_link
       Value: Orbit (rviz)
-      Yaw: 3.70279074
+      Yaw: 3.10280323
     Saved: ~
 Window Geometry:
   Displays:

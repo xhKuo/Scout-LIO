@@ -100,6 +100,8 @@ public:
     ros::Publisher pubKeyPoses;
     ros::Publisher pubPath;
 
+    ros::Publisher pubGpsOdom;
+
     ros::Publisher pubHistoryKeyFrames;
     ros::Publisher pubIcpKeyFrames;
     ros::Publisher pubRecentKeyFrames;
@@ -244,11 +246,14 @@ public:
         // 订阅GPS里程计
         sub_GPS_nav = nh.subscribe<sensor_msgs::NavSatFix>("/fix", 100, &mapOptimization::GPS_callback, this, ros::TransportHints().tcpNoDelay());
         subGPS   = nh.subscribe<nav_msgs::Odometry> (gpsTopic, 200, &mapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
+        pubGpsOdom  =  nh.advertise<nav_msgs::Odometry> ("lio_sam/gps/odometry", 1);
+
         // 订阅来自外部闭环检测程序提供的闭环数据，本程序没有提供，这里实际没用上
         subLoop  = nh.subscribe<std_msgs::Float64MultiArray>("lio_loop/loop_closure_detection", 1, &mapOptimization::loopInfoHandler, this, ros::TransportHints().tcpNoDelay());
 
         // 发布地图保存服务
         srvSaveMap  = nh.advertiseService("lio_sam/save_map", &mapOptimization::saveMapService, this);
+
 
         // 发布闭环匹配关键帧局部map
         pubHistoryKeyFrames   = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_history_cloud", 1);
@@ -446,6 +451,8 @@ public:
         TicToc gpsRev;
         m_buf.lock();
         odomGPS.header = gpsMSG->header;
+        odomGPS.header.frame_id = "odom";
+//        odomGPS.child_frame_id = "";
         //// 里程计 xyz
         double xyz[3];
         GPS2XYZ(gpsMSG->latitude,gpsMSG->longitude,gpsMSG->altitude, xyz);
@@ -456,18 +463,49 @@ public:
         odomGPS.pose.pose.position.x = tmp[0];
         odomGPS.pose.pose.position.y = tmp[1];
         odomGPS.pose.pose.position.z = tmp[2];
+        odomGPS.pose.pose.orientation.w = 1.0;
+        odomGPS.pose.pose.orientation.x = 0.0;
+        odomGPS.pose.pose.orientation.y = 0.0;
+        odomGPS.pose.pose.orientation.z = 0.0;
+
         odomGPS.pose.covariance[0] = tmp[3];
         odomGPS.pose.covariance[4] = tmp[4];
         odomGPS.pose.covariance[8] = tmp[5];
         //// angular.x 暂存卫星解算状态
         odomGPS.twist.twist.angular.x = gps_status;
-        ROS_INFO_STREAM("USE time of rev: " << gpsRev.toc());
-        ROS_INFO_STREAM("GPS position : " << tmp[0] << "  " << tmp[1] << "  " << tmp[2]);
-        ROS_INFO_STREAM("GPS COV : " << tmp[3] << "  " << tmp[4] << "  " << tmp[5] << "  " << odomGPS.twist.twist.angular.x);
-
+//        ROS_INFO_STREAM("USE time of rev: " << gpsRev.toc());
+//        ROS_INFO_STREAM("GPS position : " << tmp[0] << "  " << tmp[1] << "  " << tmp[2]);
+//        ROS_INFO_STREAM("GPS COV : " << tmp[3] << "  " << tmp[4] << "  " << tmp[5] << "  " << odomGPS.twist.twist.angular.x);
         //ROS_INFO_STREAM("GPS position : " << odomGPS.pose.pose.position.x << "  " << odomGPS.pose.pose.position.y << "  " << odomGPS.pose.pose.position.z);
 //        ROS_INFO_STREAM("GPS COV : " << odomGPS.pose.covariance[0] << "  " << odomGPS.pose.covariance[4] << "  " << odomGPS.pose.covariance[8] << "  " << odomGPS.twist.twist.angular.x);
+        pubGpsOdom.publish(odomGPS);
         gpsQueue.push_back(odomGPS);
+        //  5-1.创建 TF 广播器
+//        static tf2_ros::TransformBroadcaster broadcaster;
+//        //  5-2.创建 广播的数据(通过 pose 设置)
+//        geometry_msgs::TransformStamped tfs;
+//        //  |----头设置
+//        tfs.header =  gpsMSG->header;
+//        tfs.header.frame_id = "map";
+//
+//        //  |----坐标系 ID
+//        tfs.child_frame_id = "gpsOdom";
+//
+//        //  |----坐标系相对信息设置
+//        tfs.transform.translation.x = tmp[0];
+//        tfs.transform.translation.y = tmp[1];
+//        tfs.transform.translation.z = tmp[2]; // 二维实现，pose 中没有z，z 是 0
+//        //  |--------- 四元数设置
+////        tf2::Quaternion qtn;
+////        qtn.setRPY(0,0,pose->theta);
+//        tfs.transform.rotation.x = 0;
+//        tfs.transform.rotation.y = 0;
+//        tfs.transform.rotation.z = 0;
+//        tfs.transform.rotation.w = 1;
+//
+//
+//        //  5-3.广播器发布数据
+//        broadcaster.sendTransform(tfs);
         m_buf.unlock();
     }
 
@@ -1828,22 +1866,29 @@ public:
     */
     void addGPSFactor()
     {
-        m_buf.lock();
-        if (gpsQueue.empty())
+        ROS_INFO_STREAM("Begin to add..");
+        if (gpsQueue.empty()){
+            ROS_INFO_STREAM("gpsQueue is empty");
             return;
+        }
 
         //// 如果没有关键帧，或者首尾关键帧距离小于5m，不添加gps因子
-        if (cloudKeyPoses3D->points.empty())
+        if (cloudKeyPoses3D->points.empty()) {
+            ROS_INFO_STREAM("cloudKeyPoses3D->points.empty()");
             return;
-        else
-        {
-            if (pointDistance(cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0)
+        } else {
+            if (pointDistance(cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0){
+                ROS_INFO_STREAM("cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0");
                 return;
+            }
         }
 
         //// 位姿协方差很小，没必要加入GPS数据进行校正
-        if (poseCovariance(3,3) < poseCovThreshold && poseCovariance(4,4) < poseCovThreshold)
+        if (poseCovariance(3,3) < poseCovThreshold && poseCovariance(4,4) < poseCovThreshold){
+            ROS_INFO_STREAM("poseCovariance(3,3) < poseCovThreshold && poseCovariance(4,4) < poseCovThreshold");
             return;
+        }
+
 
         static PointType lastGPSPoint;
 
@@ -1866,10 +1911,13 @@ public:
 
                 // GPS噪声协方差太大，不能用
                 float noise_x = thisGPS.pose.covariance[0];
-                float noise_y = thisGPS.pose.covariance[7];
-                float noise_z = thisGPS.pose.covariance[14];
-                if (noise_x > gpsCovThreshold || noise_y > gpsCovThreshold)
+                float noise_y = thisGPS.pose.covariance[4];
+                float noise_z = thisGPS.pose.covariance[8];
+                if (noise_x > gpsCovThreshold || noise_y > gpsCovThreshold){
+                    ROS_INFO_STREAM("Noise is too large !!");
                     continue;
+                }
+
 
                 // GPS里程计位置
                 float gps_x = thisGPS.pose.pose.position.x;
@@ -1882,18 +1930,23 @@ public:
                 }
 
                 // (0,0,0)无效数据
-                if (abs(gps_x) < 1e-6 && abs(gps_y) < 1e-6)
+                if (abs(gps_x) < 1e-6 && abs(gps_y) < 1e-6){
+                    ROS_INFO_STREAM("data is (0,0,0), rejected !!");
                     continue;
+
+                }
 
                 // 每隔5m添加一个GPS里程计
                 PointType curGPSPoint;
                 curGPSPoint.x = gps_x;
                 curGPSPoint.y = gps_y;
                 curGPSPoint.z = gps_z;
-                if (pointDistance(curGPSPoint, lastGPSPoint) < 5.0)
+                if (pointDistance(curGPSPoint, lastGPSPoint) < 5.0){
+                    ROS_INFO_STREAM("distance is less than 5.0m !!");
                     continue;
-                else
+                } else {
                     lastGPSPoint = curGPSPoint;
+                }
 
                 // 添加GPS因子
                 gtsam::Vector Vector3(3);
@@ -1901,12 +1954,11 @@ public:
                 noiseModel::Diagonal::shared_ptr gps_noise = noiseModel::Diagonal::Variances(Vector3);
                 gtsam::GPSFactor gps_factor(cloudKeyPoses3D->size(), gtsam::Point3(gps_x, gps_y, gps_z), gps_noise);
                 gtSAMgraph.add(gps_factor);
-                ROS_INFO_STREAM("Add GPS Factor");
+                ROS_INFO_STREAM("FINISHED GPSFACTOR !!");
                 aLoopIsClosed = true;
                 break;
             }
         }
-        m_buf.unlock();
     }
 
     /**
@@ -1952,9 +2004,9 @@ public:
         // 激光里程计因子
         addOdomFactor();
 
-
         // GPS因子
-        // addGPSFactor();
+//       ROS_INFO_STREAM("addGPSFactor...");
+        addGPSFactor();
 
         // 闭环因子
         addLoopFactor();
