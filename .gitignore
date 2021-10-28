@@ -5,8 +5,13 @@
 #/temp        #仅忽略项目根目录下的TODO文件,不包括其它目录temp
 #build/       #忽略build/目录下的所有文件
 #doc/*.txt    #会忽略 doc/notes.txt 但不包括 doc/server/arch.txt
-
+#dev_zqg      #增加vscode测试
 build/
 cmake-build-debug/
 .idea/
+<<<<<<< HEAD
 Log/
+=======
+Log/
+
+>>>>>>> dev_zqg
