@@ -121,6 +121,7 @@ public:
     std::deque<nav_msgs::Odometry> gpsQueue;  //里程计数据，原程序
 
     //// GPS TO ODOM
+    Eigen::Matrix3d ENU2NWU;
     GeographicLib::LocalCartesian geoConverter;
     bool initGPS = false;
     std::queue<sensor_msgs::NavSatFixConstPtr> gps_Queue;  //// gps原始数据，修改后
@@ -224,6 +225,10 @@ public:
     */
     mapOptimization()
     {
+        //// 坐标系转化关系初始化
+        ENU2NWU << 0.0, 1.0, 0.0,
+                -1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0 ;
         // ISAM2参数
         ISAM2Params parameters;
         parameters.relinearizeThreshold = 0.1;
@@ -456,8 +461,12 @@ public:
         //// 里程计 xyz
         double xyz[3];
         GPS2XYZ(gpsMSG->latitude,gpsMSG->longitude,gpsMSG->altitude, xyz);
+        Eigen::Vector3d ENU_xyz;
+        Eigen::Vector3d NWU_xyz;
+        ENU_xyz << xyz[0], xyz[1],xyz[2];
+        NWU_xyz = ENU2NWU * ENU_xyz;
         //// 里程计xyz和协方差,解算状态
-        vector<double> tmp{xyz[0], xyz[1], xyz[2], gpsMSG->position_covariance[0],gpsMSG->position_covariance[4],gpsMSG->position_covariance[8]};
+        vector<double> tmp{NWU_xyz[0], NWU_xyz[1], NWU_xyz[2], gpsMSG->position_covariance[0],gpsMSG->position_covariance[4],gpsMSG->position_covariance[8]};
         int gps_status = (int)gpsMSG->status.status;
 
         odomGPS.pose.pose.position.x = tmp[0];
