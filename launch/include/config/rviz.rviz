@@ -128,7 +128,7 @@ Visualization Manager:
             Shaft Length: 1
             Shaft Radius: 0.0500000007
             Value: Axes
-          Topic: /odometry/gps
+          Topic: /lio_sam/gps/odometry
           Unreliable: false
           Value: true
         - Angle Tolerance: 0.100000001
