@@ -14,6 +14,7 @@
 #include "utility.h"
 #include "lio_sam/cloud_info.h"
 #include "tic_toc.h"
+#include "GlogWrapper.h"
 #include "glog/logging.h"
 
 /**
@@ -384,25 +385,17 @@ public:
 
 int main(int argc, char** argv)
 {
+    GlogWrapper gh(argv[0]);
+    LOG(INFO) << "featureExtraction ============";
     TicToc init_start;
+
     ros::init(argc, argv, "lio_sam");
-
     FeatureExtraction FE;
-
-    if (FE.isDebug){
-        google::InitGoogleLogging(argv[0]);
-        FLAGS_log_dir = FE.debugPath + "/Log";
-        FLAGS_alsologtostderr = 1;
-        LOG(INFO) << "-------> Feature Extraction Started.";
-    }
-
     ROS_INFO("\033[1;32m----> Feature Extraction Started.\033[0m");
 
     if (FE.isDebug){
-        LOG(INFO) << "初始化用时: " << init_start.toc() << "毫秒";
+      LOG(INFO) << "初始化用时: " << init_start.toc() << "毫秒";
     }
     ros::spin();
-    // 结束glog时需要关闭，否则会内存溢出
-    google::ShutdownGoogleLogging();
     return 0;
 }

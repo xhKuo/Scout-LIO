@@ -26,6 +26,7 @@
     12、发布当前帧原始点云配准之后的点云。
 **************************************************/
 #include "utility.h"
+#include "GlogWrapper.h"
 #include "lio_sam/cloud_info.h"
 #include "lio_sam/save_map.h"
 
@@ -2280,6 +2281,8 @@ public:
 
 int main(int argc, char** argv)
 {
+  GlogWrapper gh(argv[0]);
+  LOG(INFO) << "mapOptimization ============";
     ros::init(argc, argv, "lio_sam");
 
     mapOptimization MO;

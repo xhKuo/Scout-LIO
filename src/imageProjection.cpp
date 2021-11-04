@@ -14,6 +14,7 @@
     2、发布当前帧激光运动畸变校正之后的点云信息，包括点云数据、初始位姿、姿态角、有效点云数据等，发布给FeatureExtraction进行特征提取。
 **************************************************/  
 #include "utility.h"
+#include "GlogWrapper.h"
 #include "lio_sam/cloud_info.h"
 
 
@@ -794,6 +795,8 @@ public:
 
 int main(int argc, char** argv)
 {
+  GlogWrapper gh(argv[0]);
+  LOG(INFO) << "imageProjection ============";
     ros::init(argc, argv, "lio_sam");
 
     ImageProjection IP;
