@@ -1,7 +1,8 @@
 <launch>
-    <node pkg="rs_to_velodyne" type="rs_to_velodyne" name="rs2velodyne_node" args="XYZIRT" />
-    
+
     <arg name="project" default="lio_sam"/>
+    
+    <node pkg="lio_sam" type="lio_sam_rs_to_velodyne" name="rs2velodyne_node" args="XYZIRT" />
     
     <!-- Parameters -->
     <rosparam file="$(find lio_sam)/config/params.yaml" command="load" />

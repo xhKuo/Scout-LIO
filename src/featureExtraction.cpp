@@ -15,7 +15,6 @@
 #include "lio_sam/cloud_info.h"
 #include "tic_toc.h"
 #include "GlogWrapper.h"
-#include "glog/logging.h"
 
 /**
  * 激光点曲率
@@ -393,7 +392,8 @@ int main(int argc, char** argv)
     FeatureExtraction FE;
     ROS_INFO("\033[1;32m----> Feature Extraction Started.\033[0m");
 
-    if (FE.isDebug){
+    if (FE.isDebug)
+    {
       LOG(INFO) << "初始化用时: " << init_start.toc() << "毫秒";
     }
     ros::spin();
