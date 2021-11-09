@@ -2,7 +2,7 @@ lio_sam:
 
   # isDebug
   isDebug: true      # 如果开启debug，设为true 日志生成在文件路径的 LOG文件夹下
-  debugPath: "/home/lab-307/LIO-SAM_ws/src/Scout-LIO"
+  debugPath: "/home/qigao/scout_lio/src/Scout-LIO"
 
   # Topics
   pointCloudTopic: "/velodyne_points"               # Point cloud data

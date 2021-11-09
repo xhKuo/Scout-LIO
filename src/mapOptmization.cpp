@@ -2281,12 +2281,12 @@ public:
 
 int main(int argc, char** argv)
 {
-  GlogWrapper gh(argv[0]);
-  LOG(INFO) << "mapOptimization ============";
+    GlogWrapper gh(argv[0]);  
     ros::init(argc, argv, "lio_sam");
-
     mapOptimization MO;
-
+    FLAGS_log_dir = MO.debugPath + "/Log";
+    
+    LOG(INFO) << "mapOptimization ============";
     ROS_INFO("\033[1;32m----> Map Optimization Started.\033[0m");
     std::thread loopthread(&mapOptimization::loopClosureThread, &MO);
     std::thread visualizeMapThread(&mapOptimization::visualizeGlobalMapThread, &MO);

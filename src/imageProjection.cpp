@@ -796,15 +796,15 @@ public:
 int main(int argc, char** argv)
 {
   GlogWrapper gh(argv[0]);
+  
+  ros::init(argc, argv, "lio_sam");
+  ImageProjection IP;
+  FLAGS_log_dir = IP.debugPath + "/Log";
   LOG(INFO) << "imageProjection ============";
-    ros::init(argc, argv, "lio_sam");
+  ROS_INFO("\033[1;32m----> Image Projection Started.\033[0m");
 
-    ImageProjection IP;
-    
-    ROS_INFO("\033[1;32m----> Image Projection Started.\033[0m");
-
-    ros::MultiThreadedSpinner spinner(3);
-    spinner.spin();
-    
-    return 0;
+  ros::MultiThreadedSpinner spinner(3);
+  spinner.spin();
+  
+  return 0;
 }

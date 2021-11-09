@@ -384,14 +384,13 @@ public:
 
 int main(int argc, char** argv)
 {
-    GlogWrapper gh(argv[0]);
-    LOG(INFO) << "featureExtraction ============";
+    GlogWrapper gh(argv[0]);  
     TicToc init_start;
-
     ros::init(argc, argv, "lio_sam");
     FeatureExtraction FE;
+    FLAGS_log_dir = FE.debugPath + "/Log";
+    LOG(INFO) << "featureExtraction ============";
     ROS_INFO("\033[1;32m----> Feature Extraction Started.\033[0m");
-
     if (FE.isDebug)
     {
       LOG(INFO) << "初始化用时: " << init_start.toc() << "毫秒";
