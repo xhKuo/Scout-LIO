@@ -125,7 +125,8 @@ public:
 
         // 标记属于遮挡、平行两种情况的点，不做特征提取
         markOccludedPoints();
-
+        // 添加地面点分割处理
+        removeGround()
         //// 点云角点、平面点特征提取
         // 1、遍历扫描线，每根扫描线扫描一周的点云划分为6段，针对每段提取20个角点、不限数量的平面点，加入角点集合、平面点集合
         // 2、认为非角点的点都是平面点，加入平面点云集合，最后降采样
@@ -210,6 +211,12 @@ public:
             if (diff1 > 0.02 * cloudInfo.pointRange[i] && diff2 > 0.02 * cloudInfo.pointRange[i])
                 cloudNeighborPicked[i] = 1;
         }
+    }
+
+    /* 地面点分割 */
+    removeGround()
+    {
+      
     }
 
     /**

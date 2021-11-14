@@ -250,7 +250,7 @@ public:
         // 订阅当前激光帧点云信息，来自featureExtraction
         subCloud = nh.subscribe<lio_sam::cloud_info>("lio_sam/feature/cloud_info", 1, &mapOptimization::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
         // 订阅GPS里程计
-        sub_GPS_nav = nh.subscribe<sensor_msgs::NavSatFix>("/fix", 100, &mapOptimization::GPS_callback, this, ros::TransportHints().tcpNoDelay());
+        sub_GPS_nav = nh.subscribe<sensor_msgs::NavSatFix>("/fixz", 100, &mapOptimization::GPS_callback, this, ros::TransportHints().tcpNoDelay());
         subGPS   = nh.subscribe<nav_msgs::Odometry> (gpsTopic, 200, &mapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
         pubGpsOdom  =  nh.advertise<nav_msgs::Odometry> ("lio_sam/gps/odometry", 1);
 
