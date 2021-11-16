@@ -72,13 +72,17 @@ public:
     int *cloudNeighborPicked;
     // 1表示角点，-1表示平面点
     int *cloudLabel;
-    int *groundMat;
     int groundScanInd;
+    float sensorMountAngle;
+    
     /**
      * 构造函数
     */
     FeatureExtraction()
     {
+        // 初始化
+        initializationValue();
+
         // 订阅当前激光帧运动畸变校正后的点云信息
         subLaserCloudInfo = nh.subscribe<lio_sam::cloud_info>("lio_sam/deskew/cloud_info", 1, &FeatureExtraction::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
 
@@ -89,9 +93,7 @@ public:
         // 发布当前激光帧的面点点云
         pubSurfacePoints = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_surface", 1);
         // // 发布当前激光帧的地面点点云
-        pubGroundPoints  = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_ground", 1);
-        // 初始化
-        initializationValue();
+        pubGroundPoints  = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_ground", 1);       
     }
 
     // 初始化
@@ -110,8 +112,8 @@ public:
         cloudCurvature = new float[N_SCAN*Horizon_SCAN];
         cloudNeighborPicked = new int[N_SCAN*Horizon_SCAN];
         cloudLabel = new int[N_SCAN*Horizon_SCAN];
-        groundMat = new int[N_SCAN*Horizon_SCAN];
         groundScanInd = 7;
+        sensorMountAngle = 0.0;
     }
 
     /**
@@ -165,11 +167,8 @@ public:
 
             // 距离差值平方作为曲率
             cloudCurvature[i] = diffRange*diffRange;
-
             cloudNeighborPicked[i] = 0;
-            cloudLabel[i] = 0;
-            groundMat[i] = 0;
-            
+            cloudLabel[i] = 0;            
             // 存储该点曲率值、激光点一维索引
             cloudSmoothness[i].value = cloudCurvature[i];
             cloudSmoothness[i].ind = i;
@@ -228,9 +227,6 @@ public:
         groundCloud->clear();
         size_t lowerInd, upperInd;
         float diffX, diffY, diffZ, angle;
-        // groundMat
-        //  0, initial value, after validation, means not ground
-        //  1, ground
         for (size_t j = 5; j < Horizon_SCAN - 6; ++j){
             for (size_t i = 0; i < groundScanInd; ++i){
 
@@ -243,10 +239,10 @@ public:
 
                 angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;
 
-                if (abs(angle - 0.0) <= 10){
-                    groundMat[lowerInd] = 1;
-                    groundMat[upperInd] = 1;
-                    cloudNeighborPicked[lowerInd] = 1;
+                if (abs(angle - sensorMountAngle) <= 10){
+                  cloudLabel[lowerInd] = 2;
+                  cloudLabel[upperInd] = 2;
+                  cloudNeighborPicked[lowerInd] = 1;
                 }
             }
         }
@@ -255,7 +251,7 @@ public:
             for (size_t i = 0; i <= groundScanInd; ++i){
                 for (size_t j = 5; j < Horizon_SCAN - 6; ++j){
                     auto index = j + ( i )*Horizon_SCAN;
-                    if (groundMat[index] == 1)
+                    if (cloudLabel[index] == 2)
                         groundCloud->push_back(extractedCloud->points[index]);
                 }
             }
@@ -387,7 +383,7 @@ public:
                 // 平面点和未被处理的点，都认为是平面点，加入平面点云集合
                 for (int k = sp; k <= ep; k++)
                 {
-                    if (cloudLabel[k] <= 0 && groundMat[k] != 1){
+                    if (cloudLabel[k] <= 0){
                         surfaceCloudScan->push_back(extractedCloud->points[k]);
                     }
                 }
