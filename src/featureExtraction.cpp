@@ -46,6 +46,9 @@ public:
     ros::Publisher pubCornerPoints;
     // 发布当前激光帧提取的平面点点云
     ros::Publisher pubSurfacePoints;
+    
+    // 发布当前激光帧提取的GROUND点点云
+    ros::Publisher pubGroundPoints;
 
     // 当前激光帧运动畸变校正后的有效点云
     pcl::PointCloud<PointType>::Ptr extractedCloud;
@@ -53,6 +56,8 @@ public:
     pcl::PointCloud<PointType>::Ptr cornerCloud;
     // 当前激光帧平面点点云集合
     pcl::PointCloud<PointType>::Ptr surfaceCloud;
+    // 当前激光帧平面点点云集合
+    pcl::PointCloud<PointType>::Ptr groundCloud;
 
     pcl::VoxelGrid<PointType> downSizeFilter;
 
@@ -67,7 +72,8 @@ public:
     int *cloudNeighborPicked;
     // 1表示角点，-1表示平面点
     int *cloudLabel;
-
+    int *groundMat;
+    int groundScanInd;
     /**
      * 构造函数
     */
@@ -82,7 +88,8 @@ public:
         pubCornerPoints = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_corner", 1);
         // 发布当前激光帧的面点点云
         pubSurfacePoints = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_surface", 1);
-        
+        // // 发布当前激光帧的地面点点云
+        pubGroundPoints  = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_ground", 1);
         // 初始化
         initializationValue();
     }
@@ -98,10 +105,13 @@ public:
         extractedCloud.reset(new pcl::PointCloud<PointType>());
         cornerCloud.reset(new pcl::PointCloud<PointType>());
         surfaceCloud.reset(new pcl::PointCloud<PointType>());
+        groundCloud.reset(new pcl::PointCloud<PointType>());
 
         cloudCurvature = new float[N_SCAN*Horizon_SCAN];
         cloudNeighborPicked = new int[N_SCAN*Horizon_SCAN];
         cloudLabel = new int[N_SCAN*Horizon_SCAN];
+        groundMat = new int[N_SCAN*Horizon_SCAN];
+        groundScanInd = 7;
     }
 
     /**
@@ -125,8 +135,7 @@ public:
 
         // 标记属于遮挡、平行两种情况的点，不做特征提取
         markOccludedPoints();
-        // 添加地面点分割处理
-        removeGround()
+
         //// 点云角点、平面点特征提取
         // 1、遍历扫描线，每根扫描线扫描一周的点云划分为6段，针对每段提取20个角点、不限数量的平面点，加入角点集合、平面点集合
         // 2、认为非角点的点都是平面点，加入平面点云集合，最后降采样
@@ -151,13 +160,14 @@ public:
                             + cloudInfo.pointRange[i-1] - cloudInfo.pointRange[i] * 10
                             + cloudInfo.pointRange[i+1] + cloudInfo.pointRange[i+2]
                             + cloudInfo.pointRange[i+3] + cloudInfo.pointRange[i+4]
-                            + cloudInfo.pointRange[i+5];            
+                            + cloudInfo.pointRange[i+5];
 
             // 距离差值平方作为曲率
             cloudCurvature[i] = diffRange*diffRange;
 
             cloudNeighborPicked[i] = 0;
             cloudLabel[i] = 0;
+            groundMat[i] = 0;
             
             // 存储该点曲率值、激光点一维索引
             cloudSmoothness[i].value = cloudCurvature[i];
@@ -213,13 +223,44 @@ public:
         }
     }
 
-    /* 地面点分割 */
-    removeGround()
-    {
-      
+    void groundRemoval(){
+        size_t lowerInd, upperInd;
+        float diffX, diffY, diffZ, angle;
+        // groundMat
+        //  0, initial value, after validation, means not ground
+        //  1, ground
+        for (size_t j = 5; j < Horizon_SCAN - 6; ++j){
+            for (size_t i = 0; i < groundScanInd; ++i){
+
+                lowerInd = j + ( i )*Horizon_SCAN;
+                upperInd = j + (i+1)*Horizon_SCAN;
+                
+                diffX = extractedCloud->points[upperInd].x - extractedCloud->points[lowerInd].x;
+                diffY = extractedCloud->points[upperInd].y - extractedCloud->points[lowerInd].y;
+                diffZ = extractedCloud->points[upperInd].z - extractedCloud->points[lowerInd].z;
+
+                angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;
+
+                if (abs(angle - 0.0) <= 10){
+                    groundMat[lowerInd] = 1;
+                    groundMat[upperInd] = 1;
+                    cloudNeighborPicked[lowerInd] = 1;
+                }
+            }
+        }
+
+        if (pubGroundPoints.getNumSubscribers() != 0){
+            for (size_t i = 0; i <= groundScanInd; ++i){
+                for (size_t j = 5; j < Horizon_SCAN - 6; ++j){
+                    auto index = j + ( i )*Horizon_SCAN;
+                    if (groundMat[index] == 1)
+                        groundCloud->push_back(extractedCloud->points[index]);
+                }
+            }
+        }
     }
 
-    /**
+      /**
      * 点云角点、平面点特征提取
      * 1、遍历扫描线，每根扫描线扫描一周的点云划分为6段，针对每段提取20个角点、不限数量的平面点，加入角点集合、平面点集合
      * 2、认为非角点的点都是平面点，加入平面点云集合，最后降采样
@@ -228,10 +269,13 @@ public:
     {
         cornerCloud->clear();
         surfaceCloud->clear();
-
+        groundCloud->clear();
         pcl::PointCloud<PointType>::Ptr surfaceCloudScan(new pcl::PointCloud<PointType>());
         pcl::PointCloud<PointType>::Ptr surfaceCloudScanDS(new pcl::PointCloud<PointType>());
 
+        //// cloudNeighborPicked 是否筛选过的标志
+        //// cloudLabel 类别
+        groundRemoval();
         // 遍历扫描线
         for (int i = 0; i < N_SCAN; i++)
         {
@@ -263,14 +307,15 @@ public:
                 // 按照曲率从小到大排序点云
                 std::sort(cloudSmoothness.begin()+sp, cloudSmoothness.begin()+ep, by_value());
 
-                // 按照曲率从大到小遍历
+                // 按照曲率从大到小遍历，提取角点
                 int largestPickedNum = 0;
                 for (int k = ep; k >= sp; k--)
                 {
                     // 激光点的索引
                     int ind = cloudSmoothness[k].ind;
+                    // LOG(INFO) << "ind = " << ind;
                     // 当前激光点还未被处理，且曲率大于阈值，则认为是角点
-                    if (cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] > edgeThreshold)
+                    if (groundMat[ind] == 0 && cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] > edgeThreshold)
                     {
                         // 每段只取20个角点，如果单条扫描线扫描一周是1800个点，则划分6段，每段300个点，从中提取20个角点
                         largestPickedNum++;
@@ -302,16 +347,16 @@ public:
                                 break;
                             cloudNeighborPicked[ind + l] = 1;
                         }
-                    }
+                    }                    
                 }
 
-                // 按照曲率从小到大遍历
+                // 按照曲率从小到大遍历，提取面点
                 for (int k = sp; k <= ep; k++)
                 {
                     // 激光点的索引
-                    int ind = cloudSmoothness[k].ind;
+                    int ind = cloudSmoothness[k].ind;                                     
                     // 当前激光点还未被处理，且曲率小于阈值，则认为是平面点
-                    if (cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] < surfThreshold)
+                    if (groundMat[ind] == 0 && cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] < surfThreshold)
                     {
                         // 标记为平面点
                         cloudLabel[ind] = -1;
@@ -336,13 +381,13 @@ public:
 
                             cloudNeighborPicked[ind + l] = 1;
                         }
-                    }
+                    }                    
                 }
 
                 // 平面点和未被处理的点，都认为是平面点，加入平面点云集合
                 for (int k = sp; k <= ep; k++)
                 {
-                    if (cloudLabel[k] <= 0){
+                    if (cloudLabel[k] <= 0 && groundMat[k] != 1){
                         surfaceCloudScan->push_back(extractedCloud->points[k]);
                     }
                 }
@@ -383,6 +428,7 @@ public:
         // 发布角点、面点点云，用于rviz展示
         cloudInfo.cloud_corner  = publishCloud(&pubCornerPoints,  cornerCloud,  cloudHeader.stamp, lidarFrame);
         cloudInfo.cloud_surface = publishCloud(&pubSurfacePoints, surfaceCloud, cloudHeader.stamp, lidarFrame);
+        cloudInfo.cloud_ground = publishCloud(&pubGroundPoints, groundCloud, cloudHeader.stamp, lidarFrame);
         // 发布当前激光帧点云信息，加入了角点、面点点云数据，发布给mapOptimization
         pubLaserCloudInfo.publish(cloudInfo);
     }

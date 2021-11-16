@@ -5,13 +5,12 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /links1
-        - /Odometry1
         - /Odometry1/Odom IMU1
         - /Odometry1/Odom GPS1
         - /Point Cloud1
         - /Feature Cloud1
-        - /Mapping1
         - /Mapping1/Map (local)1
+        - /Plannar Feature1
       Splitter Ratio: 0.5600000023841858
     Tree Height: 683
   - Class: rviz/Selection
@@ -232,7 +231,7 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: false
-      Enabled: true
+      Enabled: false
       Name: Point Cloud
     - Class: rviz/Group
       Displays:
@@ -275,7 +274,7 @@ Visualization Manager:
           Axis: Z
           Channel Name: intensity
           Class: rviz/PointCloud2
-          Color: 255; 85; 255
+          Color: 136; 138; 133
           Color Transformer: FlatColor
           Decay Time: 0
           Enabled: true
@@ -296,7 +295,7 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: true
-      Enabled: false
+      Enabled: true
       Name: Feature Cloud
     - Class: rviz/Group
       Displays:
@@ -333,8 +332,8 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 40.833465576171875
-            Min Value: -2.5744471549987793
+            Max Value: 24.894886016845703
+            Min Value: -6.132534980773926
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -471,11 +470,10 @@ Visualization Manager:
           Marker Topic: /lio_sam/mapping/loop_closure_constraints
           Name: Loop constraint
           Namespaces:
-            loop_edges: true
-            loop_nodes: true
+            {}
           Queue Size: 100
           Value: true
-      Enabled: true
+      Enabled: false
       Name: Mapping
     - Alpha: 0.5
       Cell Size: 1
@@ -495,6 +493,36 @@ Visualization Manager:
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
       Value: false
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 239; 41; 41
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 15.100607872009277
+      Min Color: 0; 0; 0
+      Min Intensity: 0.0007188677554950118
+      Name: Plannar Feature
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.009999999776482582
+      Style: Points
+      Topic: /lio_sam/feature/cloud_ground
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 0; 0; 0
@@ -511,25 +539,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 71.76678466796875
+      Distance: 95.58641815185547
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 13.288084030151367
-        Y: 14.341666221618652
-        Z: -19.705175399780273
+        X: 19.309350967407227
+        Y: -2.1288564205169678
+        Z: -0.8968758583068848
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.384796679019928
+      Pitch: 0.5397966504096985
       Target Frame: base_link
       Value: Orbit (rviz)
-      Yaw: 4.232803821563721
+      Yaw: 3.592799425125122
     Saved: ~
 Window Geometry:
   Displays:
