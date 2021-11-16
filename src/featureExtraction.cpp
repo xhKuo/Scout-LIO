@@ -227,17 +227,20 @@ public:
         groundCloud->clear();
         size_t lowerInd, upperInd;
         float diffX, diffY, diffZ, angle;
-        for (size_t j = 5; j < Horizon_SCAN - 6; ++j){
-            for (size_t i = 0; i < groundScanInd; ++i){
-
+        // cloudLabel
+        // -1, plane points(not ground points)
+        //  0, initial value
+        //  1, edge points
+        //  2, ground points
+        for (auto j = 0; j < Horizon_SCAN; ++j){
+            for (auto i = 0; i < groundScanInd; ++i){
                 lowerInd = j + ( i )*Horizon_SCAN;
                 upperInd = j + (i+1)*Horizon_SCAN;
-                
+
                 diffX = extractedCloud->points[upperInd].x - extractedCloud->points[lowerInd].x;
                 diffY = extractedCloud->points[upperInd].y - extractedCloud->points[lowerInd].y;
                 diffZ = extractedCloud->points[upperInd].z - extractedCloud->points[lowerInd].z;
-
-                angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;
+                angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;              
 
                 if (abs(angle - sensorMountAngle) <= 10){
                   cloudLabel[lowerInd] = 2;
@@ -248,8 +251,8 @@ public:
         }
 
         if (pubGroundPoints.getNumSubscribers() != 0){
-            for (size_t i = 0; i <= groundScanInd; ++i){
-                for (size_t j = 5; j < Horizon_SCAN - 6; ++j){
+            for (auto i = 0; i <= groundScanInd; ++i){
+                for (auto j = 0; j < Horizon_SCAN; ++j){
                     auto index = j + ( i )*Horizon_SCAN;
                     if (cloudLabel[index] == 2)
                         groundCloud->push_back(extractedCloud->points[index]);
