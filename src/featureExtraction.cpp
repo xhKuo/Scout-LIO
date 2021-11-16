@@ -136,6 +136,7 @@ public:
         // 标记属于遮挡、平行两种情况的点，不做特征提取
         markOccludedPoints();
 
+        groundRemoval();
         //// 点云角点、平面点特征提取
         // 1、遍历扫描线，每根扫描线扫描一周的点云划分为6段，针对每段提取20个角点、不限数量的平面点，加入角点集合、平面点集合
         // 2、认为非角点的点都是平面点，加入平面点云集合，最后降采样
@@ -224,6 +225,7 @@ public:
     }
 
     void groundRemoval(){
+        groundCloud->clear();
         size_t lowerInd, upperInd;
         float diffX, diffY, diffZ, angle;
         // groundMat
@@ -260,7 +262,7 @@ public:
         }
     }
 
-      /**
+    /**
      * 点云角点、平面点特征提取
      * 1、遍历扫描线，每根扫描线扫描一周的点云划分为6段，针对每段提取20个角点、不限数量的平面点，加入角点集合、平面点集合
      * 2、认为非角点的点都是平面点，加入平面点云集合，最后降采样
@@ -268,14 +270,12 @@ public:
     void extractFeatures()
     {
         cornerCloud->clear();
-        surfaceCloud->clear();
-        groundCloud->clear();
+        surfaceCloud->clear();        
         pcl::PointCloud<PointType>::Ptr surfaceCloudScan(new pcl::PointCloud<PointType>());
         pcl::PointCloud<PointType>::Ptr surfaceCloudScanDS(new pcl::PointCloud<PointType>());
 
         //// cloudNeighborPicked 是否筛选过的标志
-        //// cloudLabel 类别
-        groundRemoval();
+        //// cloudLabel 类别        
         // 遍历扫描线
         for (int i = 0; i < N_SCAN; i++)
         {
@@ -315,7 +315,7 @@ public:
                     int ind = cloudSmoothness[k].ind;
                     // LOG(INFO) << "ind = " << ind;
                     // 当前激光点还未被处理，且曲率大于阈值，则认为是角点
-                    if (groundMat[ind] == 0 && cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] > edgeThreshold)
+                    if (cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] > edgeThreshold)
                     {
                         // 每段只取20个角点，如果单条扫描线扫描一周是1800个点，则划分6段，每段300个点，从中提取20个角点
                         largestPickedNum++;
@@ -356,7 +356,7 @@ public:
                     // 激光点的索引
                     int ind = cloudSmoothness[k].ind;                                     
                     // 当前激光点还未被处理，且曲率小于阈值，则认为是平面点
-                    if (groundMat[ind] == 0 && cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] < surfThreshold)
+                    if (cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] < surfThreshold)
                     {
                         // 标记为平面点
                         cloudLabel[ind] = -1;
@@ -381,7 +381,7 @@ public:
 
                             cloudNeighborPicked[ind + l] = 1;
                         }
-                    }                    
+                    }
                 }
 
                 // 平面点和未被处理的点，都认为是平面点，加入平面点云集合
