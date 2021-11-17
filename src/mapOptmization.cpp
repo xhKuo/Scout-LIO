@@ -1342,6 +1342,8 @@ public:
         // 太大了，清空一下内存
         if (laserCloudMapContainer.size() > 1000)
             laserCloudMapContainer.clear();
+            laserCloundMapGround.clear();
+
     }
 
     /**
@@ -1611,6 +1613,96 @@ public:
         }
     }
 
+    /*
+     *  地面点加入优化准备
+     *
+     * */
+    void groundOptimization(){
+        // 更新当前帧位姿
+        updatePointAssociateToMap();
+        // 遍历当前帧平面点集合
+#pragma omp parallel for num_threads(numberOfCores)
+        for (int i = 0; i < laserCloudGroundLastDSNum; i++)
+        {
+            PointType pointOri, pointSel, coeff;
+            std::vector<int> pointSearchInd;
+            std::vector<float> pointSearchSqDis;
+
+            // 地面点（坐标还是lidar系）
+            pointOri = laserCloudGroundLastDS->points[i];
+            // 根据当前帧位姿，变换到世界坐标系（map系）下
+            pointAssociateToMap(&pointOri, &pointSel);
+            // 在局部平面点map中查找当前平面点相邻的5个平面点
+            kdtreeGroundFromMap->nearestKSearch(pointSel, 5, pointSearchInd, pointSearchSqDis);
+
+            Eigen::Matrix<float, 5, 3> matA0;
+            Eigen::Matrix<float, 5, 1> matB0;
+            Eigen::Vector3f matX0;
+
+            matA0.setZero();
+            matB0.fill(-1);
+            matX0.setZero();
+
+            // 要求距离都小于1m
+            if (pointSearchSqDis[4] < 1.0) {
+                for (int j = 0; j < 5; j++) {
+                    matA0(j, 0) = laserCloudGroundFromMapDS->points[pointSearchInd[j]].x;
+                    matA0(j, 1) = laserCloudGroundFromMapDS->points[pointSearchInd[j]].y;
+                    matA0(j, 2) = laserCloudGroundFromMapDS->points[pointSearchInd[j]].z;
+                }
+
+                // 假设平面方程为ax+by+cz+1=0，这里就是求方程的系数abc，d=1
+                matX0 = matA0.colPivHouseholderQr().solve(matB0);
+
+                // 平面方程的系数，也是法向量的分量
+                float pa = matX0(0, 0);
+                float pb = matX0(1, 0);
+                float pc = matX0(2, 0);
+                float pd = 1;
+
+                // 单位法向量
+                float ps = sqrt(pa * pa + pb * pb + pc * pc);
+                pa /= ps; pb /= ps; pc /= ps; pd /= ps;
+
+                // 检查平面是否合格，如果5个点中有点到平面的距离超过0.2m，那么认为这些点太分散了，不构成平面
+                bool planeValid = true;
+                for (int j = 0; j < 5; j++) {
+                    if (fabs(pa * laserCloudGroundFromMapDS->points[pointSearchInd[j]].x +
+                             pb * laserCloudGroundFromMapDS->points[pointSearchInd[j]].y +
+                             pc * laserCloudGroundFromMapDS->points[pointSearchInd[j]].z + pd) > 0.2) {
+                        planeValid = false;
+                        break;
+                    }
+                }
+
+                // 平面合格
+                if (planeValid) {
+                    // 当前激光帧点到平面距离
+                    float pd2 = pa * pointSel.x + pb * pointSel.y + pc * pointSel.z + pd;
+
+                    float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel.x * pointSel.x
+                                                              + pointSel.y * pointSel.y + pointSel.z * pointSel.z));
+
+                    // 点到平面垂线单位法向量（其实等价于平面法向量）
+                    coeff.x = s * pa;
+                    coeff.y = s * pb;
+                    coeff.z = s * pc;
+                    // 点到平面距离
+                    coeff.intensity = s * pd2;
+
+                    if (s > 0.1) {
+                        // 当前激光帧平面点，加入匹配集合中
+                        laserCloudOriGroundVec[i] = pointOri;
+                        // 参数
+                        coeffSelGroundVec[i] = coeff;
+                        laserCloudOriGroundFlag[i] = true;
+                    }
+                }
+            }
+        }
+
+    }
+
     /**
      * 提取当前帧中与局部map匹配上了的角点、平面点，加入同一集合
     */
@@ -1634,7 +1726,7 @@ public:
         //// TODO
         //// 遍历当前帧地面点集合，提取出与局部map匹配上了的地面点
         for (int i = 0; i < laserCloudGroundLastDSNum; ++i){
-            if (laserCloudOriSurfFlag[i] == true){
+            if (laserCloudOriGroundFlag[i] == true){
                 laserCloudOri->push_back(laserCloudOriGroundVec[i]);
                 coeffSel->push_back(coeffSelGroundVec[i]);
             }
@@ -1642,6 +1734,8 @@ public:
         // 清空标记
         std::fill(laserCloudOriCornerFlag.begin(), laserCloudOriCornerFlag.end(), false);
         std::fill(laserCloudOriSurfFlag.begin(), laserCloudOriSurfFlag.end(), false);
+        std::fill(laserCloudOriGroundFlag.begin(), laserCloudOriGroundFlag.end(), false);
+
     }
 
     /**
@@ -1807,7 +1901,10 @@ public:
             //// kdtree输入为 局部map点云
             kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMapDS);
             kdtreeSurfFromMap->setInputCloud(laserCloudSurfFromMapDS);
-            kdtreeGroundFromMap->setInputCloud(laserCloudGroundFromMapDS);
+            //// TODO 参数服务器传入
+            if(laserCloudGroundLastDSNum > 0){
+                kdtreeGroundFromMap->setInputCloud(laserCloudGroundFromMapDS);
+            }
             // 迭代30次
             for (int iterCount = 0; iterCount < 30; iterCount++)
             {
@@ -1824,6 +1921,9 @@ public:
                 // 1、更新当前帧位姿，将当前帧平面点坐标变换到map系下，在局部map中查找5个最近点，距离小于1m，且5个点构成平面（最小二乘拟合平面），则认为匹配上了
                 // 2、计算当前帧平面点到平面的距离、垂线的单位向量，存储为平面点参数
                 surfOptimization();
+
+                //// 当前激光帧地面点寻找局部map匹配点
+                groundOptimization();
 
                 // 提取当前帧中与局部map匹配上了的角点、平面点，加入同一集合
                 combineOptimizationCoeffs();
@@ -2188,6 +2288,7 @@ public:
         {
             // 清空局部map
             laserCloudMapContainer.clear();
+            laserCloundMapGround.clear();
             // 清空里程计轨迹
             globalPath.poses.clear();
             // 更新因子图中所有变量节点的位姿，也就是所有历史关键帧的位姿
