@@ -2,7 +2,7 @@ lio_sam:
 
   # isDebug
   isDebug: true      # 如果开启debug，设为true 日志生成在文件路径的 LOG文件夹下
-  debugPath: "/home/qigao/scout_lio/src/Scout-LIO"
+  debugPath: "/home/lab-307/LIO-SAM_ws/src/Scout-LIO"
 
   # Topics
   pointCloudTopic: "/velodyne_points"               # Point cloud data
@@ -10,6 +10,7 @@ lio_sam:
   odomTopic: "odometry/imu"                   # IMU pre-preintegration odometry, same frequency as IMU
   gpsTopic: "odometry/gpsz"                 # GPS odometry topic from navsat, see module_navsat.launch file
 
+  # Frames
   # Frames
   lidarFrame: "base_link"
   baselinkFrame: "base_link"
@@ -69,7 +70,7 @@ lio_sam:
   mappingSurfLeafSize: 0.4                      # default: 0.4 - outdoor, 0.2 - indoor
 
   # robot motion constraint (in case you are using a 2D robot)
-  z_tollerance: 1000                            # meters
+  z_tollerance: 0.1                            # meters
   rotation_tollerance: 1000                     # radians
 
   # CPU Params
