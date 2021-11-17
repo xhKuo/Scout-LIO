@@ -795,8 +795,8 @@ public:
 
 int main(int argc, char** argv)
 {
-  GlogWrapper gh(argv[0]);
-  LOG(INFO) << "imageProjection ============";
+    GlogWrapper gh(argv[0]);
+    LOG(INFO) << "imageProjection ============";
     ros::init(argc, argv, "lio_sam");
 
     ImageProjection IP;
