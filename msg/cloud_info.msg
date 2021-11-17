@@ -28,5 +28,4 @@ sensor_msgs/PointCloud2 cloud_deskewed  # original cloud deskewed
 sensor_msgs/PointCloud2 cloud_corner    # extracted corner feature
 sensor_msgs/PointCloud2 cloud_surface   # extracted surface feature
 
-# 地面点
-sensor_msgs/PointCloud2 ground_Point   # extracted surface feature
+sensor_msgs/PointCloud2 cloud_ground   # extracted surface feature

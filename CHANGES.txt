@@ -6,3 +6,6 @@
   加入rs_to_velodyne文件到功能包中
   把glog头文件写入include目录
   imu内参标定
+2021.11.16
+  投影：rosrun pcd2pgm pcd2topic
+  存图：rosrun map_server map_saver

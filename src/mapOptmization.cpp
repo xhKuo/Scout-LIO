@@ -250,7 +250,7 @@ public:
         // 订阅当前激光帧点云信息，来自featureExtraction
         subCloud = nh.subscribe<lio_sam::cloud_info>("lio_sam/feature/cloud_info", 1, &mapOptimization::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
         // 订阅GPS里程计
-        sub_GPS_nav = nh.subscribe<sensor_msgs::NavSatFix>("/fix", 100, &mapOptimization::GPS_callback, this, ros::TransportHints().tcpNoDelay());
+        sub_GPS_nav = nh.subscribe<sensor_msgs::NavSatFix>("/fixz", 100, &mapOptimization::GPS_callback, this, ros::TransportHints().tcpNoDelay());
         subGPS   = nh.subscribe<nav_msgs::Odometry> (gpsTopic, 200, &mapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
         pubGpsOdom  =  nh.advertise<nav_msgs::Odometry> ("lio_sam/gps/odometry", 1);
 
@@ -2281,12 +2281,12 @@ public:
 
 int main(int argc, char** argv)
 {
-  GlogWrapper gh(argv[0]);
-  LOG(INFO) << "mapOptimization ============";
+    GlogWrapper gh(argv[0]);  
     ros::init(argc, argv, "lio_sam");
-
     mapOptimization MO;
-
+    FLAGS_log_dir = MO.debugPath + "/Log";
+    
+    LOG(INFO) << "mapOptimization ============";
     ROS_INFO("\033[1;32m----> Map Optimization Started.\033[0m");
     std::thread loopthread(&mapOptimization::loopClosureThread, &MO);
     std::thread visualizeMapThread(&mapOptimization::visualizeGlobalMapThread, &MO);

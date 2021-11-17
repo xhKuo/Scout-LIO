@@ -615,14 +615,15 @@ public:
 
 int main(int argc, char** argv)
 {
-  GlogWrapper gh(argv[0]);
-  LOG(INFO) << "imuPreintegration ============";
+    GlogWrapper gh(argv[0]);
+  
     ros::init(argc, argv, "roboat_loam");
     
     IMUPreintegration ImuP;
 
     TransformFusion TF;
-
+    FLAGS_log_dir = TF.debugPath + "/Log";
+    LOG(INFO) << "imuPreintegration ============";
     ROS_INFO("\033[1;32m----> IMU Preintegration Started.\033[0m");
     
     ros::MultiThreadedSpinner spinner(4);
