@@ -24,7 +24,7 @@ lio_sam:
   poseCovThreshold: 25.0                      # m^2, threshold for using GPS data
   
   # Export settings
-  savePCD: true                              # https://github.com/TixiaoShan/LIO-SAM/issues/3
+  savePCD: false                              # https://github.com/TixiaoShan/LIO-SAM/issues/3
   savePCDDirectory: "/Download/LIO-SAM"        # in your home folder, starts and ends with "/". Warning: the code deletes "LOAM" folder then recreates it. See "mapOptimization" for implementation
 
   # Sensor Settings
@@ -70,7 +70,7 @@ lio_sam:
   mappingSurfLeafSize: 0.4                      # default: 0.4 - outdoor, 0.2 - indoor
 
   # robot motion constraint (in case you are using a 2D robot)
-  z_tollerance: 0.1                            # meters
+  z_tollerance: 100                          # meters
   rotation_tollerance: 1000                     # radians
 
   # CPU Params

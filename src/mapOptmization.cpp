@@ -132,7 +132,8 @@ public:
     vector<pcl::PointCloud<PointType>::Ptr> cornerCloudKeyFrames;
     // 历史所有关键帧的平面点集合（降采样）
     vector<pcl::PointCloud<PointType>::Ptr> surfCloudKeyFrames;
-
+    // 历史所有关键帧的平面点集合（降采样）
+    vector<pcl::PointCloud<PointType>::Ptr> groundCloudKeyFrames;
     //// 历史关键帧位姿（位置） 指的是 xyz
     pcl::PointCloud<PointType>::Ptr cloudKeyPoses3D;
     // 历史关键帧位姿
@@ -144,12 +145,15 @@ public:
     pcl::PointCloud<PointType>::Ptr laserCloudCornerLast;
     // 当前激光帧平面点集合
     pcl::PointCloud<PointType>::Ptr laserCloudSurfLast;
+    // 当前激光帧地面点集合
+    pcl::PointCloud<PointType>::Ptr laserCloudGroundLast;
     // 当前激光帧角点集合，降采样，DS: DownSize
     pcl::PointCloud<PointType>::Ptr laserCloudCornerLastDS;
     // 当前激光帧平面点集合，降采样
     pcl::PointCloud<PointType>::Ptr laserCloudSurfLastDS;
-
-    // 当前帧与局部map匹配上了的角点、平面点，加入同一集合；后面是对应点的参数
+    // 当前激光帧地面点集合，降采样
+    pcl::PointCloud<PointType>::Ptr laserCloudGroundLastDS;
+    // 当前帧与局部map匹配上了的角点、平面点、地面点，加入同一集合；后面是对应点的参数
     pcl::PointCloud<PointType>::Ptr laserCloudOri;
     pcl::PointCloud<PointType>::Ptr coeffSel;
 
@@ -162,19 +166,32 @@ public:
     std::vector<PointType> coeffSelSurfVec;
     std::vector<bool> laserCloudOriSurfFlag;
 
+    // 当前帧与局部map匹配上了的地面点、参数、标记
+    std::vector<PointType> laserCloudOriGroundVec;
+    std::vector<PointType> coeffSelGroundVec;
+    std::vector<bool> laserCloudOriGroundFlag;
+
     map<int, pair<pcl::PointCloud<PointType>, pcl::PointCloud<PointType>>> laserCloudMapContainer;
+    map<int, pcl::PointCloud<PointType>> laserCloundMapGround;
     // 局部map的角点集合
     pcl::PointCloud<PointType>::Ptr laserCloudCornerFromMap;
     // 局部map的平面点集合
     pcl::PointCloud<PointType>::Ptr laserCloudSurfFromMap;
+    // 局部map的地面点集合
+    pcl::PointCloud<PointType>::Ptr laserCloudGroundFromMap;
+
     // 局部map的角点集合，降采样
     pcl::PointCloud<PointType>::Ptr laserCloudCornerFromMapDS;
     // 局部map的平面点集合，降采样
     pcl::PointCloud<PointType>::Ptr laserCloudSurfFromMapDS;
+    // 局部map的地面点集合. 降采样
+    pcl::PointCloud<PointType>::Ptr laserCloudGroundFromMapDS;
 
     // 局部关键帧构建的map点云，对应kdtree，用于scan-to-map找相邻点
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeCornerFromMap;
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap;
+    pcl::KdTreeFLANN<PointType>::Ptr kdtreeGroundFromMap;
+
 
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurroundingKeyPoses;
     pcl::KdTreeFLANN<PointType>::Ptr kdtreeHistoryKeyPoses;
@@ -182,6 +199,7 @@ public:
     // 降采样
     pcl::VoxelGrid<PointType> downSizeFilterCorner;
     pcl::VoxelGrid<PointType> downSizeFilterSurf;
+    pcl::VoxelGrid<PointType> downSizeFilterGround;
     pcl::VoxelGrid<PointType> downSizeFilterICP;
     pcl::VoxelGrid<PointType> downSizeFilterSurroundingKeyPoses; // for surrounding key poses of scan-to-map optimization
 
@@ -200,10 +218,14 @@ public:
     int laserCloudCornerFromMapDSNum = 0;
     // 局部map平面点数量
     int laserCloudSurfFromMapDSNum = 0;
+    // 局部map 地面点数量
+    int laserCloudGroundFromMapDSNum = 0;
     // 当前激光帧角点数量
     int laserCloudCornerLastDSNum = 0;
     // 当前激光帧面点数量
     int laserCloudSurfLastDSNum = 0;
+    // 当前激光帧地面点数量
+    int laserCloudGroundLastDSNum = 0;
 
     bool aLoopIsClosed = false;
     map<int, int> loopIndexContainer; // from new to old
@@ -236,6 +258,8 @@ public:
         parameters.relinearizeSkip = 1;
         isam = new ISAM2(parameters);
 
+        //// 初始化
+        allocateMemory();
         // 发布历史关键帧里程计
         pubKeyPoses                 = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/trajectory", 1);
         // 发布局部关键帧map的特征点云
@@ -277,10 +301,12 @@ public:
 
         downSizeFilterCorner.setLeafSize(mappingCornerLeafSize, mappingCornerLeafSize, mappingCornerLeafSize);
         downSizeFilterSurf.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
+        downSizeFilterGround.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
+
         downSizeFilterICP.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
         downSizeFilterSurroundingKeyPoses.setLeafSize(surroundingKeyframeDensity, surroundingKeyframeDensity, surroundingKeyframeDensity); // for surrounding key poses of scan-to-map optimization
 
-        allocateMemory();
+
     }
 
     /**
@@ -298,8 +324,11 @@ public:
 
         laserCloudCornerLast.reset(new pcl::PointCloud<PointType>()); // corner feature set from odoOptimization
         laserCloudSurfLast.reset(new pcl::PointCloud<PointType>()); // surf feature set from odoOptimization
+        laserCloudGroundLast.reset(new pcl::PointCloud<PointType>()); // ground feature set from odoOptimization
+
         laserCloudCornerLastDS.reset(new pcl::PointCloud<PointType>()); // downsampled corner featuer set from odoOptimization
         laserCloudSurfLastDS.reset(new pcl::PointCloud<PointType>()); // downsampled surf featuer set from odoOptimization
+        laserCloudGroundLastDS.reset(new pcl::PointCloud<PointType>()); // downsampled ground featuer set from odoOptimization
 
         laserCloudOri.reset(new pcl::PointCloud<PointType>());
         coeffSel.reset(new pcl::PointCloud<PointType>());
@@ -311,16 +340,26 @@ public:
         coeffSelSurfVec.resize(N_SCAN * Horizon_SCAN);
         laserCloudOriSurfFlag.resize(N_SCAN * Horizon_SCAN);
 
+        laserCloudOriGroundVec.resize(N_SCAN * Horizon_SCAN);
+        coeffSelGroundVec.resize(N_SCAN * Horizon_SCAN);
+        laserCloudOriGroundFlag.resize(N_SCAN * Horizon_SCAN);
+
         std::fill(laserCloudOriCornerFlag.begin(), laserCloudOriCornerFlag.end(), false);
         std::fill(laserCloudOriSurfFlag.begin(), laserCloudOriSurfFlag.end(), false);
+        std::fill(laserCloudOriGroundFlag.begin(), laserCloudOriGroundFlag.end(), false);
 
         laserCloudCornerFromMap.reset(new pcl::PointCloud<PointType>());
         laserCloudSurfFromMap.reset(new pcl::PointCloud<PointType>());
+        laserCloudGroundFromMap.reset(new pcl::PointCloud<PointType>());
         laserCloudCornerFromMapDS.reset(new pcl::PointCloud<PointType>());
         laserCloudSurfFromMapDS.reset(new pcl::PointCloud<PointType>());
+        laserCloudGroundFromMapDS.reset(new pcl::PointCloud<PointType>());
+
 
         kdtreeCornerFromMap.reset(new pcl::KdTreeFLANN<PointType>());
         kdtreeSurfFromMap.reset(new pcl::KdTreeFLANN<PointType>());
+        kdtreeGroundFromMap.reset(new pcl::KdTreeFLANN<PointType>());
+
 
         for (int i = 0; i < 6; ++i){
             transformTobeMapped[i] = 0;
@@ -370,6 +409,7 @@ public:
         cloudInfo = *msgIn;
         pcl::fromROSMsg(msgIn->cloud_corner,  *laserCloudCornerLast);
         pcl::fromROSMsg(msgIn->cloud_surface, *laserCloudSurfLast);
+        pcl::fromROSMsg(msgIn->cloud_ground, *laserCloudGroundLast);
 
         std::lock_guard<std::mutex> lock(mtx);
 
@@ -385,11 +425,11 @@ public:
             updateInitialGuess();
 
             //// 提取局部角点、平面点云集合，加入局部map
-            // 1、对最近的一帧关键帧，搜索时空维度上相邻的关键帧集合，降采样一下
-            // 2、对关键帧集合中的每一帧，提取对应的角点、平面点，加入局部map中
+            //// 1、对最近的一帧关键帧，搜索时空维度上相邻的关键帧集合，降采样一下
+            //// 2、对关键帧集合中的每一帧，提取对应的角点、平面点、地面点，加入局部map中
             extractSurroundingKeyFrames();
 
-            //// 当前激光帧角点、平面点集合降采样
+            //// 当前激光帧角点、平面点、地面点集合降采样
             downsampleCurrentScan();
 
             //// scan-to-map优化当前帧位姿
@@ -676,7 +716,7 @@ public:
 
         downSizeFilterCorner.setLeafSize(mappingCornerLeafSize, mappingCornerLeafSize, mappingCornerLeafSize);
         downSizeFilterSurf.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
-
+        downSizeFilterGround.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
         cout << "****************************************************" << endl;
         cout << "Saving map to pcd files completed\n" << endl;
 
@@ -750,6 +790,8 @@ public:
             int thisKeyInd = (int)globalMapKeyPosesDS->points[i].intensity;
             *globalMapKeyFrames += *transformPointCloud(cornerCloudKeyFrames[thisKeyInd],  &cloudKeyPoses6D->points[thisKeyInd]);
             *globalMapKeyFrames += *transformPointCloud(surfCloudKeyFrames[thisKeyInd],    &cloudKeyPoses6D->points[thisKeyInd]);
+            *globalMapKeyFrames += *transformPointCloud(groundCloudKeyFrames[thisKeyInd],    &cloudKeyPoses6D->points[thisKeyInd]);
+
         }
         // 降采样，发布
         pcl::VoxelGrid<PointType> downSizeFilterGlobalMapKeyFrames; // for global map visualization
@@ -1020,6 +1062,7 @@ public:
                 continue;
             *nearKeyframes += *transformPointCloud(cornerCloudKeyFrames[keyNear], &copy_cloudKeyPoses6D->points[keyNear]);
             *nearKeyframes += *transformPointCloud(surfCloudKeyFrames[keyNear],   &copy_cloudKeyPoses6D->points[keyNear]);
+            *nearKeyframes += *transformPointCloud(groundCloudKeyFrames[keyNear], &copy_cloudKeyPoses6D->points[keyNear]);
         }
 
         if (nearKeyframes->empty())
@@ -1110,8 +1153,10 @@ public:
             transformTobeMapped[1] = cloudInfo.imuPitchInit;
             transformTobeMapped[2] = cloudInfo.imuYawInit;
 
-            if (!useImuHeadingInitialization)
+            if (!useImuHeadingInitialization){
+                //// Yaw 置0
                 transformTobeMapped[2] = 0;
+            }
 
             lastImuTransformation = pcl::getTransformation(0, 0, 0, cloudInfo.imuRollInit, cloudInfo.imuPitchInit, cloudInfo.imuYawInit);
             return;
@@ -1198,7 +1243,7 @@ public:
     }
 
     /**
-     * 提取局部角点、平面点云集合，加入局部map
+     * 提取局部角点、平面点、地面点云集合，加入局部map
      * 1、对最近的一帧关键帧，搜索时空维度上相邻的关键帧集合，降采样一下
      * 2、对关键帧集合中的每一帧，提取对应的角点、平面点，加入局部map中
     */
@@ -1248,6 +1293,8 @@ public:
         // 相邻关键帧集合对应的角点、平面点，加入到局部map中；注：称之为局部map，后面进行scan-to-map匹配，所用到的map就是这里的相邻关键帧对应点云集合
         laserCloudCornerFromMap->clear();
         laserCloudSurfFromMap->clear();
+        laserCloudGroundFromMap->clear();
+
         // 遍历当前帧（实际是取最近的一个关键帧来找它相邻的关键帧集合）时空维度上相邻的关键帧集合
         for (int i = 0; i < (int)cloudToExtract->size(); ++i)
         {
@@ -1262,14 +1309,19 @@ public:
                 //// 如果已经加入
                 *laserCloudCornerFromMap += laserCloudMapContainer[thisKeyInd].first;
                 *laserCloudSurfFromMap   += laserCloudMapContainer[thisKeyInd].second;
+                *laserCloudGroundFromMap += laserCloundMapGround[thisKeyInd];
             } else {
                 // 相邻关键帧对应的角点、平面点云，通过6D位姿变换到世界坐标系下
                 pcl::PointCloud<PointType> laserCloudCornerTemp = *transformPointCloud(cornerCloudKeyFrames[thisKeyInd],  &cloudKeyPoses6D->points[thisKeyInd]);
                 pcl::PointCloud<PointType> laserCloudSurfTemp = *transformPointCloud(surfCloudKeyFrames[thisKeyInd],    &cloudKeyPoses6D->points[thisKeyInd]);
+                pcl::PointCloud<PointType> laserCloudGroundTemp = *transformPointCloud(groundCloudKeyFrames[thisKeyInd],    &cloudKeyPoses6D->points[thisKeyInd]);
                 // 加入局部map
                 *laserCloudCornerFromMap += laserCloudCornerTemp;
                 *laserCloudSurfFromMap   += laserCloudSurfTemp;
+                *laserCloudGroundFromMap += laserCloudGroundTemp;
                 laserCloudMapContainer[thisKeyInd] = make_pair(laserCloudCornerTemp, laserCloudSurfTemp);
+                //// 存放局部地图地面点
+                laserCloundMapGround[thisKeyInd] = laserCloudGroundTemp;
             }
 
         }
@@ -1283,13 +1335,17 @@ public:
         downSizeFilterSurf.filter(*laserCloudSurfFromMapDS);
         laserCloudSurfFromMapDSNum = laserCloudSurfFromMapDS->size();
 
+        //// 降采样局部平面点map
+        downSizeFilterGround.setInputCloud(laserCloudGroundFromMap);
+        downSizeFilterGround.filter(*laserCloudGroundFromMapDS);
+        laserCloudSurfFromMapDSNum = laserCloudGroundFromMapDS->size();
         // 太大了，清空一下内存
         if (laserCloudMapContainer.size() > 1000)
             laserCloudMapContainer.clear();
     }
 
     /**
-     * 提取局部角点、平面点云集合，加入局部map
+     * 提取局部角点、平面点、地面点云集合，加入局部map
      * 1、对最近的一帧关键帧，搜索时空维度上相邻的关键帧集合，降采样一下
      * 2、对关键帧集合中的每一帧，提取对应的角点、平面点，加入局部map中
     */
@@ -1312,7 +1368,7 @@ public:
     }
 
     /**
-     * 当前激光帧角点、平面点集合降采样
+     * 当前激光帧角点、平面点、地面点集合降采样
     */
     void downsampleCurrentScan()
     {
@@ -1327,6 +1383,12 @@ public:
         downSizeFilterSurf.setInputCloud(laserCloudSurfLast);
         downSizeFilterSurf.filter(*laserCloudSurfLastDS);
         laserCloudSurfLastDSNum = laserCloudSurfLastDS->size();
+
+        //// 当前激光帧平面点集合降采样
+        laserCloudGroundLastDS->clear();
+        downSizeFilterGround.setInputCloud(laserCloudGroundLast);
+        downSizeFilterGround.filter(*laserCloudGroundLastDS);
+        laserCloudGroundLastDSNum = laserCloudGroundLastDS->size();
     }
 
     /**
@@ -1568,6 +1630,15 @@ public:
                 coeffSel->push_back(coeffSelSurfVec[i]);
             }
         }
+
+        //// TODO
+        //// 遍历当前帧地面点集合，提取出与局部map匹配上了的地面点
+        for (int i = 0; i < laserCloudGroundLastDSNum; ++i){
+            if (laserCloudOriSurfFlag[i] == true){
+                laserCloudOri->push_back(laserCloudOriGroundVec[i]);
+                coeffSel->push_back(coeffSelGroundVec[i]);
+            }
+        }
         // 清空标记
         std::fill(laserCloudOriCornerFlag.begin(), laserCloudOriCornerFlag.end(), false);
         std::fill(laserCloudOriSurfFlag.begin(), laserCloudOriSurfFlag.end(), false);
@@ -1730,12 +1801,13 @@ public:
             return;
 
         //// 2. 当前激光帧的角点、平面点数量足够多
+        //// TODO 考虑是否laserCloudGroundLastDSNum加入条件判断
         if (laserCloudCornerLastDSNum > edgeFeatureMinValidNum && laserCloudSurfLastDSNum > surfFeatureMinValidNum)
         {
             //// kdtree输入为 局部map点云
             kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMapDS);
             kdtreeSurfFromMap->setInputCloud(laserCloudSurfFromMapDS);
-
+            kdtreeGroundFromMap->setInputCloud(laserCloudGroundFromMapDS);
             // 迭代30次
             for (int iterCount = 0; iterCount < 30; iterCount++)
             {
@@ -2089,13 +2161,17 @@ public:
         // 当前帧激光角点、平面点，降采样集合
         pcl::PointCloud<PointType>::Ptr thisCornerKeyFrame(new pcl::PointCloud<PointType>());
         pcl::PointCloud<PointType>::Ptr thisSurfKeyFrame(new pcl::PointCloud<PointType>());
+        pcl::PointCloud<PointType>::Ptr thisGroundKeyFrame(new pcl::PointCloud<PointType>());
+
         pcl::copyPointCloud(*laserCloudCornerLastDS,  *thisCornerKeyFrame);
         pcl::copyPointCloud(*laserCloudSurfLastDS,    *thisSurfKeyFrame);
+        pcl::copyPointCloud(*laserCloudGroundLastDS,  *thisGroundKeyFrame);
+
 
         // 保存特征点降采样集合
         cornerCloudKeyFrames.push_back(thisCornerKeyFrame);
         surfCloudKeyFrames.push_back(thisSurfKeyFrame);
-
+        groundCloudKeyFrames.push_back(thisGroundKeyFrame);
         // 更新里程计轨迹
         updatePath(thisPose6D);
     }

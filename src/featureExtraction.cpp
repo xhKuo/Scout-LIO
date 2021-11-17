@@ -284,7 +284,7 @@ public:
                 }
             }
         }
-        ROS_INFO_STREAM("TIME OF T_G: "<< t_ground.toc() << "\n");
+        //ROS_INFO_STREAM("TIME OF T_G: "<< t_ground.toc() << "\n");
         //// TODO 分割马路边缘
         segRoadEdge();
     }
