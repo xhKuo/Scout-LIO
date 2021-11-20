@@ -258,8 +258,6 @@ public:
         parameters.relinearizeSkip = 1;
         isam = new ISAM2(parameters);
 
-        //// 初始化
-        allocateMemory();
         // 发布历史关键帧里程计
         pubKeyPoses                 = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/trajectory", 1);
         // 发布局部关键帧map的特征点云
@@ -305,7 +303,8 @@ public:
 
         downSizeFilterICP.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
         downSizeFilterSurroundingKeyPoses.setLeafSize(surroundingKeyframeDensity, surroundingKeyframeDensity, surroundingKeyframeDensity); // for surrounding key poses of scan-to-map optimization
-
+        //// 初始化
+        allocateMemory();
 
     }
 
@@ -410,7 +409,7 @@ public:
         pcl::fromROSMsg(msgIn->cloud_corner,  *laserCloudCornerLast);
         pcl::fromROSMsg(msgIn->cloud_surface, *laserCloudSurfLast);
         pcl::fromROSMsg(msgIn->cloud_ground, *laserCloudGroundLast);
-
+        ROS_INFO_STREAM("Size of point:" << laserCloudGroundLast->size());
         std::lock_guard<std::mutex> lock(mtx);
 
         // mapping执行频率控制
@@ -1340,9 +1339,11 @@ public:
         downSizeFilterGround.filter(*laserCloudGroundFromMapDS);
         laserCloudSurfFromMapDSNum = laserCloudGroundFromMapDS->size();
         // 太大了，清空一下内存
-        if (laserCloudMapContainer.size() > 1000)
+        if (laserCloudMapContainer.size() > 1000){
             laserCloudMapContainer.clear();
             laserCloundMapGround.clear();
+        }
+
 
     }
 

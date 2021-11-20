@@ -266,7 +266,7 @@ public:
                 diffZ = extractedCloud->points[upperInd].z - extractedCloud->points[lowerInd].z;
                 angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;              
 
-                if (abs(angle - sensorMountAngle) <= 2 && extractedCloud->points[lowerInd].z < -0.4){
+                if (abs(angle - sensorMountAngle) <= 10 && extractedCloud->points[lowerInd].z < -0.4){
                   cloudLabel[lowerInd] = 2;
                   cloudLabel[upperInd] = 2;
                   cloudNeighborPicked[lowerInd] = 1;
