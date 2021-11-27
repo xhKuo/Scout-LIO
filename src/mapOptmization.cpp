@@ -242,12 +242,14 @@ public:
     Eigen::Affine3f incrementalOdometryAffineFront;
     // 当前帧位姿
     Eigen::Affine3f incrementalOdometryAffineBack;
+    bool initialized_flag_;
 
     /**
      * 构造函数
     */
     mapOptimization()
     {
+        initialized_flag_ = false;
         //// 坐标系转化关系初始化
         ENU2NWU << 0.0, 1.0, 0.0,
                 -1.0, 0.0, 0.0,
@@ -409,7 +411,7 @@ public:
         pcl::fromROSMsg(msgIn->cloud_corner,  *laserCloudCornerLast);
         pcl::fromROSMsg(msgIn->cloud_surface, *laserCloudSurfLast);
         pcl::fromROSMsg(msgIn->cloud_ground, *laserCloudGroundLast);
-        ROS_INFO_STREAM("Size of point:" << laserCloudGroundLast->size());
+        // ROS_INFO_STREAM("Size of point:" << laserCloudGroundLast->size());
         std::lock_guard<std::mutex> lock(mtx);
 
         // mapping执行频率控制
@@ -957,7 +959,6 @@ public:
         // 当前关键帧帧
         int loopKeyCur = copy_cloudKeyPoses3D->size() - 1;
         int loopKeyPre = -1;
-
         // 当前帧已经添加过闭环对应关系，不再继续添加
         auto it = loopIndexContainer.find(loopKeyCur);
         if (it != loopIndexContainer.end())
@@ -973,8 +974,10 @@ public:
         for (int i = 0; i < (int)pointSearchIndLoop.size(); ++i)
         {
             int id = pointSearchIndLoop[i];
-            if (abs(copy_cloudKeyPoses6D->points[id].time - timeLaserInfoCur) > historyKeyframeSearchTimeDiff)
+            if (abs(copy_cloudKeyPoses6D->points[id].time - timeLaserInfoCur) > historyKeyframeSearchTimeDiff &&
+                id < loopKeyCur - 30)
             {
+                ROS_INFO_STREAM("============ less than current frame number 30 =============");
                 loopKeyPre = id;
                 break;
             }
@@ -2010,13 +2013,14 @@ public:
         float x, y, z, roll, pitch, yaw;
         pcl::getTranslationAndEulerAngles(transBetween, x, y, z, roll, pitch, yaw);
 
-        // 旋转和平移量都较小，当前帧不设为关键帧
+        // 旋转和平移量都较小，当前帧不设为关键帧        
         if (abs(roll)  < surroundingkeyframeAddingAngleThreshold &&
             abs(pitch) < surroundingkeyframeAddingAngleThreshold &&
             abs(yaw)   < surroundingkeyframeAddingAngleThreshold &&
-            sqrt(x*x + y*y + z*z) < surroundingkeyframeAddingDistThreshold)
-            return false;
-
+            sqrt(x*x + y*y + z*z) < ((initialized_flag_ == false) ? shorterDistThreshold : surroundingkeyframeAddingDistThreshold))
+            {
+              return false;
+            }
         return true;
     }
 
@@ -2054,13 +2058,16 @@ public:
             ROS_INFO_STREAM("gpsQueue is empty");
             return;
         }
-
+       
         //// 如果没有关键帧，或者首尾关键帧距离小于5m，不添加gps因子
+        //// todo 接收到gps就加入因子图中
         if (cloudKeyPoses3D->points.empty()) {
             ROS_INFO_STREAM("cloudKeyPoses3D->points.empty()");
             return;
-        } else {
-            if (pointDistance(cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 1.0){
+        } 
+        else if(initialized_flag_)
+        {
+            if (pointDistance(cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0){
                 ROS_INFO_STREAM("cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0");
                 return;
             }
@@ -2123,11 +2130,22 @@ public:
                 curGPSPoint.x = gps_x;
                 curGPSPoint.y = gps_y;
                 curGPSPoint.z = gps_z;
-                if (pointDistance(curGPSPoint, lastGPSPoint) < 1.0){
-                    ROS_INFO_STREAM("distance is less than 5.0m !!");
-                    continue;
+                // 已经初始化，并且gps间隔较小则不加入优化中
+                if(initialized_flag_){
+                    if (pointDistance(curGPSPoint, lastGPSPoint) < 5.0){
+                        ROS_INFO_STREAM("gps distance is less than 5.0m !!");
+                        continue;
+                    }
+                    else
+                        lastGPSPoint = curGPSPoint;
                 } else {
-                    lastGPSPoint = curGPSPoint;
+                  ROS_INFO_STREAM("======================= global map did not alignment now !! ===================");
+                  // 如果没有初始化，就加入gps
+                  lastGPSPoint = curGPSPoint;                  
+                  if(sqrt(gps_x * gps_x + gps_y * gps_y) > 1.5){
+                      initialized_flag_ = true;
+                      ROS_INFO_STREAM("======================= global map alignment now !! ===================");
+                  }
                 }
 
                 // 添加GPS因子

@@ -61,8 +61,6 @@ public:
     pcl::PointCloud<PointType>::Ptr surfaceCloud;
     // 当前激光帧平面点点云集合
     pcl::PointCloud<PointType>::Ptr groundCloud;
-    //// 当前激光帧马路边缘点的点云集合
-    pcl::PointCloud<PointType>::Ptr roadEdgeCloud;
 
     pcl::VoxelGrid<PointType> downSizeFilter;
 
@@ -116,7 +114,6 @@ public:
         cornerCloud.reset(new pcl::PointCloud<PointType>());
         surfaceCloud.reset(new pcl::PointCloud<PointType>());
         groundCloud.reset(new pcl::PointCloud<PointType>());
-        roadEdgeCloud.reset(new pcl::PointCloud<PointType>());
 
         cloudCurvature = new float[N_SCAN*Horizon_SCAN];
         cloudNeighborPicked = new int[N_SCAN*Horizon_SCAN];
@@ -233,19 +230,6 @@ public:
         }
     }
 
-
-    void segRoadEdge(){
-        // TODO
-        //ROS_INFO_STREAM("segRoadEdge");
-        roadEdgeCloud->clear();
-        //// 1. 取 Z<-0.5 and 曲率大的点
-
-        //// 2. 根据 z 和 曲率 大小进行得分，
-
-        //// 3. 取得分高的点，左右取8个点，根据z轴变化值大小分割，得到马路边缘
-
-    }
-
     void groundRemoval(){
         groundCloud->clear();
         size_t lowerInd, upperInd;
@@ -266,7 +250,7 @@ public:
                 diffZ = extractedCloud->points[upperInd].z - extractedCloud->points[lowerInd].z;
                 angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;              
 
-                if (abs(angle - sensorMountAngle) <= 10 && extractedCloud->points[lowerInd].z < -0.4){
+                if (abs(angle - sensorMountAngle) <= 10 && extractedCloud->points[lowerInd].z < -0.5){
                   cloudLabel[lowerInd] = 2;
                   cloudLabel[upperInd] = 2;
                   cloudNeighborPicked[lowerInd] = 1;
@@ -275,18 +259,19 @@ public:
             }
         }
 
-        if (pubGroundPoints.getNumSubscribers() != 0){
-            for (auto i = 0; i <= groundScanInd; ++i){
-                for (auto j = 0; j < Horizon_SCAN; ++j){
-                    auto index = j + ( i )*Horizon_SCAN;
+        if (pubGroundPoints.getNumSubscribers() != 0)
+        {
+            for (auto i = 0; i <= groundScanInd; ++i)
+            {
+                for (auto j = 0; j < Horizon_SCAN; ++j)
+                {
+                    auto index = j + i * Horizon_SCAN;
                     if (cloudLabel[index] == 2)
                         groundCloud->push_back(extractedCloud->points[index]);
                 }
             }
         }
         //ROS_INFO_STREAM("TIME OF T_G: "<< t_ground.toc() << "\n");
-        //// TODO 分割马路边缘
-        segRoadEdge();
     }
 
 
@@ -457,7 +442,6 @@ public:
         cloudInfo.cloud_corner  = publishCloud(&pubCornerPoints,  cornerCloud,  cloudHeader.stamp, lidarFrame);
         cloudInfo.cloud_surface = publishCloud(&pubSurfacePoints, surfaceCloud, cloudHeader.stamp, lidarFrame);
         cloudInfo.cloud_ground = publishCloud(&pubGroundPoints, groundCloud, cloudHeader.stamp, lidarFrame);
-        cloudInfo.cloud_roadEdge = publishCloud(&pubRoadEdgePoints, roadEdgeCloud, cloudHeader.stamp, lidarFrame);
 
         // 发布当前激光帧点云信息，加入了角点、面点点云数据，发布给mapOptimization
         pubLaserCloudInfo.publish(cloudInfo);

@@ -135,8 +135,9 @@ public:
     double mappingProcessInterval;
 
     // Surrounding map
-    float surroundingkeyframeAddingDistThreshold; 
-    float surroundingkeyframeAddingAngleThreshold; 
+    float shorterDistThreshold;
+    float surroundingkeyframeAddingDistThreshold;     
+    float surroundingkeyframeAddingAngleThreshold;     
     float surroundingKeyframeDensity;
     float surroundingKeyframeSearchRadius;
     
@@ -233,6 +234,7 @@ public:
         nh.param<int>("lio_sam/numberOfCores", numberOfCores, 2);
         nh.param<double>("lio_sam/mappingProcessInterval", mappingProcessInterval, 0.15);
 
+        nh.param<float>("lio_sam/shorterDistThreshold", shorterDistThreshold, 0.1);
         nh.param<float>("lio_sam/surroundingkeyframeAddingDistThreshold", surroundingkeyframeAddingDistThreshold, 1.0);
         nh.param<float>("lio_sam/surroundingkeyframeAddingAngleThreshold", surroundingkeyframeAddingAngleThreshold, 0.2);
         nh.param<float>("lio_sam/surroundingKeyframeDensity", surroundingKeyframeDensity, 1.0);

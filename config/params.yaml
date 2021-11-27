@@ -78,6 +78,7 @@ lio_sam:
   mappingProcessInterval: 0.15                  # seconds, regulate mapping frequency
 
   # Surrounding map
+  shorterDistThreshold: 0.1                     # 0.1 meters, regulate keyframe adding threshold
   surroundingkeyframeAddingDistThreshold: 1.0   # meters, regulate keyframe adding threshold
   surroundingkeyframeAddingAngleThreshold: 0.2  # radians, regulate keyframe adding threshold
   surroundingKeyframeDensity: 2.0               # meters, downsample surrounding keyframe poses   

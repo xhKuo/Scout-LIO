@@ -9,3 +9,6 @@
 2021.11.16
   投影：rosrun pcd2pgm pcd2topic
   存图：rosrun map_server map_saver
+2021.11.23
+  更加平滑的初始化策略
+  避免刚启动时的帧间回环约束
