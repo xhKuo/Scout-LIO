@@ -76,6 +76,10 @@ private:
     ros::Publisher pubExtractedCloud;
     ros::Publisher pubLaserCloudInfo;
 
+    /// outlier point
+    ros::Publisher pubOutlierCloud;
+    pcl::PointCloud<PointType>::Ptr outlierCloud;
+
     // imu数据队列（原始数据，转lidar系下）
     ros::Subscriber subImu;
     std::deque<sensor_msgs::Imu> imuQueue;
@@ -109,6 +113,9 @@ private:
 
     int deskewFlag;
     cv::Mat rangeMat;
+    cv::Mat labelMat; // label matrix for segmentaiton marking
+    cv::Mat groundMat; // ground matrix for ground cloud marking
+    int labelCount;
 
     bool odomDeskewFlag;
     // 当前激光帧起止时刻对应imu里程计位姿变换，该变换对应的平移增量；用于插值计算当前激光帧起止时间范围内，每一时刻的位置
@@ -124,6 +131,14 @@ private:
     double timeScanEnd;
     // 当前帧header，包含时间戳信息
     std_msgs::Header cloudHeader;
+
+    std::vector<std::pair<int8_t, int8_t> > neighborIterator; // neighbor iterator for segmentaiton process
+
+    uint16_t *allPushedIndX; // array for tracking points of a segmented object
+    uint16_t *allPushedIndY;
+
+    uint16_t *queueIndX; // array for breadth-first search process of segmentation, for speed
+    uint16_t *queueIndY;
 
 
 public:
@@ -142,8 +157,12 @@ public:
 
         // 发布当前激光帧运动畸变校正后的点云，有效点
         pubExtractedCloud = nh.advertise<sensor_msgs::PointCloud2> ("lio_sam/deskew/cloud_deskewed", 1);
+        // 发布outlier point
+        pubOutlierCloud = nh.advertise<sensor_msgs::PointCloud2> ("/outlier_cloud", 1);
+
         // 发布当前激光帧运动畸变校正后的点云信息
         pubLaserCloudInfo = nh.advertise<lio_sam::cloud_info> ("lio_sam/deskew/cloud_info", 1);
+        
 
         // 初始化
         allocateMemory();
@@ -163,14 +182,29 @@ public:
         tmpOusterCloudIn.reset(new pcl::PointCloud<OusterPointXYZIRT>());
         fullCloud.reset(new pcl::PointCloud<PointType>());
         extractedCloud.reset(new pcl::PointCloud<PointType>());
+        outlierCloud.reset(new pcl::PointCloud<PointType>());
+
 
         fullCloud->points.resize(N_SCAN*Horizon_SCAN);
 
         cloudInfo.startRingIndex.assign(N_SCAN, 0);
         cloudInfo.endRingIndex.assign(N_SCAN, 0);
 
+        cloudInfo.segmentedCloudGroundFlag.assign(N_SCAN*Horizon_SCAN, false);
         cloudInfo.pointColInd.assign(N_SCAN*Horizon_SCAN, 0);
         cloudInfo.pointRange.assign(N_SCAN*Horizon_SCAN, 0);
+
+        std::pair<int8_t, int8_t> neighbor;
+        neighbor.first = -1; neighbor.second =  0; neighborIterator.push_back(neighbor);
+        neighbor.first =  0; neighbor.second =  1; neighborIterator.push_back(neighbor);
+        neighbor.first =  0; neighbor.second = -1; neighborIterator.push_back(neighbor);
+        neighbor.first =  1; neighbor.second =  0; neighborIterator.push_back(neighbor);
+
+        allPushedIndX = new uint16_t[N_SCAN*Horizon_SCAN];
+        allPushedIndY = new uint16_t[N_SCAN*Horizon_SCAN];
+
+        queueIndX = new uint16_t[N_SCAN*Horizon_SCAN];
+        queueIndY = new uint16_t[N_SCAN*Horizon_SCAN];
 
         resetParameters();
     }
@@ -182,8 +216,12 @@ public:
     {
         laserCloudIn->clear();
         extractedCloud->clear();
+        outlierCloud->clear();
 
         rangeMat = cv::Mat(N_SCAN, Horizon_SCAN, CV_32F, cv::Scalar::all(FLT_MAX));
+        groundMat = cv::Mat(N_SCAN, Horizon_SCAN, CV_8S, cv::Scalar::all(0));
+        labelMat = cv::Mat(N_SCAN, Horizon_SCAN, CV_32S, cv::Scalar::all(0));
+        labelCount = 1;
 
         imuPointerCur = 0;
         firstPointFlag = true;
@@ -271,9 +309,11 @@ public:
         // 1、检查激光点距离、扫描线是否合规
         // 2、激光运动畸变校正，保存激光点
         projectPointCloud();
+        /// 提取前先进性分割
+        cloudSegmentation();
 
         //// 提取有效激光点，存extractedCloud
-        cloudExtraction();
+        // cloudExtraction();
 
         //// 发布当前帧校正后点云，有效点
         publishClouds();
@@ -748,39 +788,178 @@ public:
         }
     }
 
+
+    void cloudSegmentation(){
+        // segmentation process
+        for (size_t i = 0; i < N_SCAN; ++i)
+            for (size_t j = 0; j < Horizon_SCAN; ++j)
+                if (labelMat.at<int>(i,j) == 0)
+                    labelComponents(i, j);
+
+        int sizeOfSegCloud = 0;
+        // extract segmented cloud for lidar odometry
+        for (size_t i = 0; i < N_SCAN; ++i) {
+
+            cloudInfo.startRingIndex[i] = sizeOfSegCloud-1 + 5;
+
+            for (size_t j = 0; j < Horizon_SCAN; ++j) {
+                if (labelMat.at<int>(i,j) > 0 || groundMat.at<int8_t>(i,j) == 1){
+                    // outliers that will not be used for optimization (always continue)
+                    if (labelMat.at<int>(i,j) == 999999){
+                        if (i > groundScanInd && j % 5 == 0){
+                            outlierCloud->push_back(fullCloud->points[j + i*Horizon_SCAN]);
+                            continue;
+                        }else{
+                            continue;
+                        }
+                    }
+                    // majority of ground points are skipped
+                    if (groundMat.at<int8_t>(i,j) == 1){
+                        if (j%5!=0 && j>5 && j<Horizon_SCAN-5)
+                            continue;
+                    }
+                    // mark ground points so they will not be considered as edge features later
+                    cloudInfo.segmentedCloudGroundFlag[sizeOfSegCloud] = (groundMat.at<int8_t>(i,j) == 1);
+                    // mark the points' column index for marking occlusion later
+                    cloudInfo.pointColInd[sizeOfSegCloud] = j;
+                    // save range info
+                    cloudInfo.pointRange[sizeOfSegCloud]  = rangeMat.at<float>(i,j);
+                    // save seg cloud
+                    extractedCloud->push_back(fullCloud->points[j + i*Horizon_SCAN]);
+                    // size of seg cloud
+                    ++sizeOfSegCloud;
+                }
+            }
+
+            cloudInfo.endRingIndex[i] = sizeOfSegCloud-1 - 5;
+        }
+    }
+
+    void labelComponents(int row, int col){
+        // use std::queue std::vector std::deque will slow the program down greatly
+        float d1, d2, alpha, angle;
+        int fromIndX, fromIndY, thisIndX, thisIndY; 
+        bool lineCountFlag[N_SCAN] = {false};
+
+        queueIndX[0] = row;
+        queueIndY[0] = col;
+        int queueSize = 1;
+        int queueStartInd = 0;
+        int queueEndInd = 1;
+
+        allPushedIndX[0] = row;
+        allPushedIndY[0] = col;
+        int allPushedIndSize = 1;
+        
+        while(queueSize > 0){
+            // Pop point
+            fromIndX = queueIndX[queueStartInd];
+            fromIndY = queueIndY[queueStartInd];
+            --queueSize;
+            ++queueStartInd;
+            // Mark popped point
+            labelMat.at<int>(fromIndX, fromIndY) = labelCount;
+            // Loop through all the neighboring grids of popped grid
+            for (auto iter = neighborIterator.begin(); iter != neighborIterator.end(); ++iter){
+                // new index
+                thisIndX = fromIndX + (*iter).first;
+                thisIndY = fromIndY + (*iter).second;
+                // index should be within the boundary
+                if (thisIndX < 0 || thisIndX >= N_SCAN)
+                    continue;
+                // at range image margin (left or right side)
+                if (thisIndY < 0)
+                    thisIndY = Horizon_SCAN - 1;
+                if (thisIndY >= Horizon_SCAN)
+                    thisIndY = 0;
+                // prevent infinite loop (caused by put already examined point back)
+                if (labelMat.at<int>(thisIndX, thisIndY) != 0)
+                    continue;
+
+                d1 = std::max(rangeMat.at<float>(fromIndX, fromIndY), 
+                              rangeMat.at<float>(thisIndX, thisIndY));
+                d2 = std::min(rangeMat.at<float>(fromIndX, fromIndY), 
+                              rangeMat.at<float>(thisIndX, thisIndY));
+
+                if ((*iter).first == 0)
+                    alpha = segmentAlphaX;
+                else
+                    alpha = segmentAlphaY;
+
+                angle = atan2(d2*sin(alpha), (d1 -d2*cos(alpha)));
+
+                if (angle > segmentTheta){
+
+                    queueIndX[queueEndInd] = thisIndX;
+                    queueIndY[queueEndInd] = thisIndY;
+                    ++queueSize;
+                    ++queueEndInd;
+
+                    labelMat.at<int>(thisIndX, thisIndY) = labelCount;
+                    lineCountFlag[thisIndX] = true;
+
+                    allPushedIndX[allPushedIndSize] = thisIndX;
+                    allPushedIndY[allPushedIndSize] = thisIndY;
+                    ++allPushedIndSize;
+                }
+            }
+        }
+
+        // check if this segment is valid
+        bool feasibleSegment = false;
+        if (allPushedIndSize >= 20)
+            feasibleSegment = true;
+        else if (allPushedIndSize >= segmentValidPointNum){
+            int lineCount = 0;
+            for (size_t i = 0; i < N_SCAN; ++i)
+                if (lineCountFlag[i] == true)
+                    ++lineCount;
+            if (lineCount >= segmentValidLineNum)
+                feasibleSegment = true;            
+        }
+        // segment is valid, mark these points
+        if (feasibleSegment == true){
+            ++labelCount;
+        }else{ // segment is invalid, mark these points
+            for (size_t i = 0; i < allPushedIndSize; ++i){
+                labelMat.at<int>(allPushedIndX[i], allPushedIndY[i]) = 999999;
+            }
+        }
+    }
+
     /**
      * 提取有效激光点，存extractedCloud
     */
-    void cloudExtraction()
-    {
-        // 有效激光点数量
-        int count = 0;
-        // 遍历所有激光点
-        for (int i = 0; i < N_SCAN; ++i)
-        {
-            ////提取特征的时候，每一行的前5个和最后5个不考虑
-            //// TODO 为什么前后五个点不考虑
-            // 记录每根扫描线起始第5个激光点在一维数组中的索引
-            cloudInfo.startRingIndex[i] = count - 1 + 5;
+    // void cloudExtraction()
+    // {
+    //     // 有效激光点数量
+    //     int count = 0;
+    //     // 遍历所有激光点
+    //     for (int i = 0; i < N_SCAN; ++i)
+    //     {
+    //         ////提取特征的时候，每一行的前5个和最后5个不考虑
+    //         //// TODO 为什么前后五个点不考虑
+    //         // 记录每根扫描线起始第5个激光点在一维数组中的索引
+    //         cloudInfo.startRingIndex[i] = count - 1 + 5;
 
-            for (int j = 0; j < Horizon_SCAN; ++j)
-            {
-                //// 有效激光点,已经赋值距离的激光点
-                if (rangeMat.at<float>(i,j) != FLT_MAX)
-                {
-                    // 记录激光点对应的Horizon_SCAN方向上的索引
-                    cloudInfo.pointColInd[count] = j;
-                    // 激光点距离
-                    cloudInfo.pointRange[count] = rangeMat.at<float>(i,j);
-                    // 加入有效激光点
-                    extractedCloud->push_back(fullCloud->points[j + i*Horizon_SCAN]);
-                    ++count;
-                }
-            }
-            // 记录每根扫描线倒数第5个激光点在一维数组中的索引
-            cloudInfo.endRingIndex[i] = count -1 - 5;
-        }
-    }
+    //         for (int j = 0; j < Horizon_SCAN; ++j)
+    //         {
+    //             //// 有效激光点,已经赋值距离的激光点
+    //             if (rangeMat.at<float>(i,j) != FLT_MAX)
+    //             {
+    //                 // 记录激光点对应的Horizon_SCAN方向上的索引
+    //                 cloudInfo.pointColInd[count] = j;
+    //                 // 激光点距离
+    //                 cloudInfo.pointRange[count] = rangeMat.at<float>(i,j);
+    //                 // 加入有效激光点
+    //                 extractedCloud->push_back(fullCloud->points[j + i*Horizon_SCAN]);
+    //                 ++count;
+    //             }
+    //         }
+    //         // 记录每根扫描线倒数第5个激光点在一维数组中的索引
+    //         cloudInfo.endRingIndex[i] = count -1 - 5;
+    //     }
+    // }
     
     /**
      * 发布当前帧校正后点云，有效点
@@ -789,6 +968,7 @@ public:
     {
         cloudInfo.header = cloudHeader;
         cloudInfo.cloud_deskewed  = publishCloud(&pubExtractedCloud, extractedCloud, cloudHeader.stamp, lidarFrame);
+        cloudInfo.cloud_outlier  = publishCloud(&pubOutlierCloud, outlierCloud, cloudHeader.stamp, lidarFrame);
         pubLaserCloudInfo.publish(cloudInfo);
     }
 };

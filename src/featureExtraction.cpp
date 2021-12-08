@@ -50,9 +50,6 @@ public:
     // 发布当前激光帧提取的GROUND点点云
     ros::Publisher pubGroundPoints;
 
-    // 发布当前激光帧提取的RoadEdge点点云
-    ros::Publisher pubRoadEdgePoints;
-
     // 当前激光帧运动畸变校正后的有效点云
     pcl::PointCloud<PointType>::Ptr extractedCloud;
     // 当前激光帧角点点云集合
@@ -97,9 +94,6 @@ public:
         pubSurfacePoints = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_surface", 1);
         // // 发布当前激光帧的地面点点云
         pubGroundPoints  = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_ground", 1);
-        //// 发布当前激光帧的路面角点点云
-        pubRoadEdgePoints  = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_roadEdge", 1);
-
     }
 
     // 初始化

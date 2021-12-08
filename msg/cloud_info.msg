@@ -4,6 +4,7 @@ Header header
 int32[] startRingIndex
 int32[] endRingIndex
 
+bool[]   segmentedCloudGroundFlag # true - ground point, false - other points
 int32[]  pointColInd # point column index in range image
 float32[] pointRange # point range 
 
@@ -29,4 +30,4 @@ sensor_msgs/PointCloud2 cloud_corner    # extracted corner feature
 sensor_msgs/PointCloud2 cloud_surface   # extracted surface feature
 
 sensor_msgs/PointCloud2 cloud_ground   # extracted Ground feature
-sensor_msgs/PointCloud2 cloud_roadEdge   # extracted Ground feature
+sensor_msgs/PointCloud2 cloud_outlier   # extracted Ground feature

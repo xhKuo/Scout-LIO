@@ -59,6 +59,16 @@ typedef pcl::PointXYZI PointType;
 
 enum class SensorType { VELODYNE, OUSTER };
 
+extern const float ang_res_x = 0.2;
+extern const float ang_res_y = 2.0;
+extern const float segmentAlphaX = ang_res_x / 180.0 * M_PI;
+extern const float segmentAlphaY = ang_res_y / 180.0 * M_PI;
+extern const float segmentTheta = 60.0/180.0*M_PI; // decrese this value may improve accuracy
+extern const int groundScanInd = 7;
+extern const int segmentValidPointNum = 5;
+extern const int segmentValidLineNum = 3;
+extern const float sensorMountAngle = 0.0;
+
 class ParamServer
 {
 public:
