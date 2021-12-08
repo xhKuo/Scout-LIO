@@ -232,33 +232,59 @@ public:
 
     void groundRemoval(){
         groundCloud->clear();
-        size_t lowerInd, upperInd;
-        float diffX, diffY, diffZ, angle;
         // cloudLabel
         // -1, plane points(not ground points)
         //  0, initial value
         //  1, edge points
         //  2, ground points
-        TicToc t_ground;
-        for (auto j = 0; j < Horizon_SCAN; ++j){
-            for (auto i = 0; i < groundScanInd; ++i){
-                lowerInd = j + ( i )*Horizon_SCAN;
-                upperInd = j + (i+1)*Horizon_SCAN;
 
-                diffX = extractedCloud->points[upperInd].x - extractedCloud->points[lowerInd].x;
-                diffY = extractedCloud->points[upperInd].y - extractedCloud->points[lowerInd].y;
-                diffZ = extractedCloud->points[upperInd].z - extractedCloud->points[lowerInd].z;
-                angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;              
+        if(!distance_threshold)
+        {
+          size_t lowerInd, upperInd;
+          float diffX, diffY, diffZ, angle;
+          TicToc t_ground;
+          for (auto j = 0; j < Horizon_SCAN; ++j){
+              for (auto i = 0; i < groundScanInd; ++i){
+                  lowerInd = j + ( i )*Horizon_SCAN;
+                  upperInd = j + (i+1)*Horizon_SCAN;
 
-                if (abs(angle - sensorMountAngle) <= 10 && extractedCloud->points[lowerInd].z < -0.5){
-                  cloudLabel[lowerInd] = 2;
-                  cloudLabel[upperInd] = 2;
-                  cloudNeighborPicked[lowerInd] = 1;
-                  cloudNeighborPicked[upperInd] = 1;
-                }
-            }
+                  diffX = extractedCloud->points[upperInd].x - extractedCloud->points[lowerInd].x;
+                  diffY = extractedCloud->points[upperInd].y - extractedCloud->points[lowerInd].y;
+                  diffZ = extractedCloud->points[upperInd].z - extractedCloud->points[lowerInd].z;
+                  angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;              
+
+                  if (abs(angle - sensorMountAngle) <= 10 && extractedCloud->points[lowerInd].z < -0.5){
+                    cloudLabel[lowerInd] = 2;
+                    cloudLabel[upperInd] = 2;
+                    cloudNeighborPicked[lowerInd] = 1;
+                    cloudNeighborPicked[upperInd] = 1;
+                  }
+              }
+          }
         }
-
+        else
+        {
+          size_t current_index;
+          float angle, theory_distance, measurement_distance;
+          for(auto i = 0; i <= groundScanInd; ++i)        
+          {
+            for(auto j = 0; j < Horizon_SCAN; ++j)
+            {
+              current_index = j + i * Horizon_SCAN;
+              angle = 75 + i * 2.0;
+              theory_distance = 0.75 * tan(angle * M_PI / 180);
+              measurement_distance = sqrt(extractedCloud->points[current_index].x * extractedCloud->points[current_index].x +
+                      extractedCloud->points[current_index].y * extractedCloud->points[current_index].y);
+                      // extractedCloud->points[current_index].z * extractedCloud->points[current_index].z);
+              if(abs(theory_distance - measurement_distance) <= distance_threshold)
+              {
+                cloudLabel[current_index] = 2;
+                cloudNeighborPicked[current_index] = 1;
+              }
+            }
+          }
+        }
+        
         if (pubGroundPoints.getNumSubscribers() != 0)
         {
             for (auto i = 0; i <= groundScanInd; ++i)

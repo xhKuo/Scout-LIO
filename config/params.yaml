@@ -78,6 +78,7 @@ lio_sam:
   mappingProcessInterval: 0.15                  # seconds, regulate mapping frequency
 
   # Surrounding map
+  distance_threshold: 0.8
   shorterDistThreshold: 0.1                     # 0.1 meters, regulate keyframe adding threshold
   surroundingkeyframeAddingDistThreshold: 1.0   # meters, regulate keyframe adding threshold
   surroundingkeyframeAddingAngleThreshold: 0.2  # radians, regulate keyframe adding threshold
@@ -85,7 +86,7 @@ lio_sam:
   surroundingKeyframeSearchRadius: 50.0         # meters, within n meters scan-to-map optimization (when loop closure disabled)
 
   # Loop closure
-  loopClosureEnableFlag: true
+  loopClosureEnableFlag: false
   loopClosureFrequency: 1.0                     # Hz, regulate loop closure constraint add frequency
   surroundingKeyframeSize: 50                   # submap size (when loop closure enabled)
   historyKeyframeSearchRadius: 15.0             # meters, key frame that is within n meters from current pose will be considerd for loop closure
