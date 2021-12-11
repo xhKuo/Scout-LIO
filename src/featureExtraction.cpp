@@ -14,7 +14,6 @@
 #include "utility.h"
 #include "lio_sam/cloud_info.h"
 #include "tic_toc.h"
-#include "GlogWrapper.h"
 
 /**
  * 激光点曲率
@@ -326,7 +325,6 @@ public:
                 {
                     // 激光点的索引
                     int ind = cloudSmoothness[k].ind;
-                    // LOG(INFO) << "ind = " << ind;
                     // 当前激光点还未被处理，且曲率大于阈值，则认为是角点
                     if (cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] > edgeThreshold)
                     {
@@ -451,16 +449,13 @@ public:
 
 int main(int argc, char** argv)
 {
-    GlogWrapper gh(argv[0]);  
     TicToc init_start;
     ros::init(argc, argv, "lio_sam");
     FeatureExtraction FE;
-    FLAGS_log_dir = FE.debugPath + "/Log";
-    LOG(INFO) << "featureExtraction ============";
     ROS_INFO("\033[1;32m----> Feature Extraction Started.\033[0m");
     if (FE.isDebug)
     {
-      LOG(INFO) << "初始化用时: " << init_start.toc() << "毫秒";
+      std::cout << "初始化用时: " << init_start.toc() << "毫秒" << std::endl;
     }
     ros::spin();
     return 0;

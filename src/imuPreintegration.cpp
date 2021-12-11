@@ -26,7 +26,6 @@ IMUPreintegration类
     1、发布imu里程计；
 **************************************************/ 
 #include "utility.h"
-#include "GlogWrapper.h"
 
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/geometry/Pose3.h>
@@ -615,15 +614,12 @@ public:
 
 int main(int argc, char** argv)
 {
-    GlogWrapper gh(argv[0]);
   
     ros::init(argc, argv, "roboat_loam");
     
     IMUPreintegration ImuP;
 
     TransformFusion TF;
-    FLAGS_log_dir = TF.debugPath + "/Log";
-    LOG(INFO) << "imuPreintegration ============";
     ROS_INFO("\033[1;32m----> IMU Preintegration Started.\033[0m");
     
     ros::MultiThreadedSpinner spinner(4);

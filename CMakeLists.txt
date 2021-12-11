@@ -83,7 +83,6 @@ link_directories(
 ############################
 set(ALL_TARGET_LIBRARIES_CMAKE "")
 set(ALL_TARGET_INCLUDE_CMAKE "")
-include(cmake/glog.cmake)
 include(cmake/geographic.cmake)
 
 
