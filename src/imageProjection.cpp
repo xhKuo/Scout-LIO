@@ -76,9 +76,12 @@ private:
     ros::Publisher pubExtractedCloud;
     ros::Publisher pubLaserCloudInfo;
 
-    /// outlier point
+    /// outlier cloud
     ros::Publisher pubOutlierCloud;
     pcl::PointCloud<PointType>::Ptr outlierCloud;
+    /// ground cloud
+    ros::Publisher pubGroundCloud;
+    pcl::PointCloud<PointType>::Ptr groundCloud;
 
     // imu数据队列（原始数据，转lidar系下）
     ros::Subscriber subImu;
@@ -162,6 +165,8 @@ public:
 
         // 发布当前激光帧运动畸变校正后的点云信息
         pubLaserCloudInfo = nh.advertise<lio_sam::cloud_info> ("lio_sam/deskew/cloud_info", 1);
+        pubGroundCloud  = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_ground", 1);
+
         
 
         // 初始化
@@ -183,6 +188,7 @@ public:
         fullCloud.reset(new pcl::PointCloud<PointType>());
         extractedCloud.reset(new pcl::PointCloud<PointType>());
         outlierCloud.reset(new pcl::PointCloud<PointType>());
+        groundCloud.reset(new pcl::PointCloud<PointType>());
 
 
         fullCloud->points.resize(N_SCAN*Horizon_SCAN);
@@ -309,10 +315,13 @@ public:
         // 1、检查激光点距离、扫描线是否合规
         // 2、激光运动畸变校正，保存激光点
         projectPointCloud();
-        /// 提取前先进性分割
+
+        /// 标记地面点
+        groundRemoval();
+        /// 点云聚类
         cloudSegmentation();
 
-        //// 提取有效激光点，存extractedCloud
+        // 提取有效激光点，存extractedCloud
         // cloudExtraction();
 
         //// 发布当前帧校正后点云，有效点
@@ -788,6 +797,83 @@ public:
         }
     }
 
+    void groundRemoval(){
+      groundCloud->clear();
+      if(!distance_threshold)
+      {
+        size_t lowerInd, upperInd;
+        float diffX, diffY, diffZ, angle;
+        // groundMat
+        // -1, no valid info to check if ground of not
+        //  0, initial value, after validation, means not ground
+        //  1, ground
+        for (size_t j = 0; j < Horizon_SCAN; ++j){
+            for (size_t i = 0; i < groundScanInd; ++i){
+
+                lowerInd = j + ( i )*Horizon_SCAN;
+                upperInd = j + (i+1)*Horizon_SCAN;
+
+                if (fullCloud->points[lowerInd].intensity == -1 ||
+                    fullCloud->points[upperInd].intensity == -1){
+                    // no info to check, invalid points
+                    groundMat.at<int8_t>(i,j) = -1;
+                    continue;
+                }
+                    
+                diffX = fullCloud->points[upperInd].x - fullCloud->points[lowerInd].x;
+                diffY = fullCloud->points[upperInd].y - fullCloud->points[lowerInd].y;
+                diffZ = fullCloud->points[upperInd].z - fullCloud->points[lowerInd].z;
+
+                angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;
+
+                if (abs(angle - sensorMountAngle) <= 10){
+                    groundMat.at<int8_t>(i,j) = 1;
+                    groundMat.at<int8_t>(i+1,j) = 1;
+                }
+            }
+        }
+      }
+      else
+      {
+        size_t current_index;
+        float angle, theory_distance, measurement_distance;
+        for(auto j = 0; j < Horizon_SCAN; ++j)
+        {
+          for(auto i = 0; i <= groundScanInd; ++i)
+          {
+            current_index = j + i * Horizon_SCAN;
+            angle = 75 + i * 2.0;
+            theory_distance = 0.75 * tan(angle * M_PI / 180);
+            measurement_distance = sqrt(fullCloud->points[current_index].x * fullCloud->points[current_index].x +
+                    fullCloud->points[current_index].y * fullCloud->points[current_index].y);
+                    // fullCloud->points[current_index].z * fullCloud->points[current_index].z);
+            if(abs(theory_distance - measurement_distance) <= distance_threshold)
+            {
+              groundMat.at<int8_t>(i,j) = 1;
+            }
+          }
+        }
+      }
+        // extract ground cloud (groundMat == 1)
+        // mark entry that doesn't need to label (ground and invalid point) for segmentation
+        // note that ground remove is from 0~N_SCAN-1, need rangeMat for mark label matrix for the 16th scan
+        for (size_t i = 0; i < N_SCAN; ++i){
+            for (size_t j = 0; j < Horizon_SCAN; ++j){
+                if (groundMat.at<int8_t>(i,j) == 1 || rangeMat.at<float>(i,j) == FLT_MAX){
+                    labelMat.at<int>(i,j) = -1;
+                }
+            }
+        }
+        if (pubGroundCloud.getNumSubscribers() != 0){
+            for (size_t i = 0; i < groundScanInd; ++i){
+                for (size_t j = 0; j < Horizon_SCAN; ++j){
+                    if (groundMat.at<int8_t>(i,j) == 1)
+                        groundCloud->push_back(fullCloud->points[j + i*Horizon_SCAN]);
+                }
+            }
+        }
+    }
+
 
     void cloudSegmentation(){
         // segmentation process
@@ -907,7 +993,7 @@ public:
 
         // check if this segment is valid
         bool feasibleSegment = false;
-        if (allPushedIndSize >= 20)
+        if (allPushedIndSize >= 30)
             feasibleSegment = true;
         else if (allPushedIndSize >= segmentValidPointNum){
             int lineCount = 0;
@@ -969,6 +1055,8 @@ public:
         cloudInfo.header = cloudHeader;
         cloudInfo.cloud_deskewed  = publishCloud(&pubExtractedCloud, extractedCloud, cloudHeader.stamp, lidarFrame);
         cloudInfo.cloud_outlier  = publishCloud(&pubOutlierCloud, outlierCloud, cloudHeader.stamp, lidarFrame);
+        cloudInfo.cloud_ground = publishCloud(&pubGroundCloud, groundCloud, cloudHeader.stamp, lidarFrame);
+
         pubLaserCloudInfo.publish(cloudInfo);
     }
 };

@@ -48,7 +48,7 @@ public:
     ros::Publisher pubSurfacePoints;
     
     // 发布当前激光帧提取的GROUND点点云
-    ros::Publisher pubGroundPoints;
+    // ros::Publisher pubGroundPoints;
 
     // 当前激光帧运动畸变校正后的有效点云
     pcl::PointCloud<PointType>::Ptr extractedCloud;
@@ -57,7 +57,7 @@ public:
     // 当前激光帧平面点点云集合
     pcl::PointCloud<PointType>::Ptr surfaceCloud;
     // 当前激光帧平面点点云集合
-    pcl::PointCloud<PointType>::Ptr groundCloud;
+    // pcl::PointCloud<PointType>::Ptr groundCloud;
 
     pcl::VoxelGrid<PointType> downSizeFilter;
 
@@ -72,7 +72,7 @@ public:
     int *cloudNeighborPicked;
     // 1表示角点，-1表示平面点
     int *cloudLabel;
-    int groundScanInd;
+    // int groundScanInd;
     float sensorMountAngle;
     
     /**
@@ -93,7 +93,7 @@ public:
         // 发布当前激光帧的面点点云
         pubSurfacePoints = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_surface", 1);
         // // 发布当前激光帧的地面点点云
-        pubGroundPoints  = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_ground", 1);
+        // pubGroundPoints  = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_ground", 1);
     }
 
     // 初始化
@@ -107,12 +107,12 @@ public:
         extractedCloud.reset(new pcl::PointCloud<PointType>());
         cornerCloud.reset(new pcl::PointCloud<PointType>());
         surfaceCloud.reset(new pcl::PointCloud<PointType>());
-        groundCloud.reset(new pcl::PointCloud<PointType>());
+        // groundCloud.reset(new pcl::PointCloud<PointType>());
 
         cloudCurvature = new float[N_SCAN*Horizon_SCAN];
         cloudNeighborPicked = new int[N_SCAN*Horizon_SCAN];
         cloudLabel = new int[N_SCAN*Horizon_SCAN];
-        groundScanInd = 7;
+        // groundScanInd = 7;
         sensorMountAngle = 0.0;
     }
 
@@ -139,7 +139,7 @@ public:
         markOccludedPoints();
 
         //// 分割地面点
-        groundRemoval();
+        // groundRemoval();
         //// 点云角点、平面点特征提取
         // 1、遍历扫描线，每根扫描线扫描一周的点云划分为6段，针对每段提取20个角点、不限数量的平面点，加入角点集合、平面点集合
         // 2、认为非角点的点都是平面点，加入平面点云集合，最后降采样
@@ -224,75 +224,75 @@ public:
         }
     }
 
-    void groundRemoval(){
-        groundCloud->clear();
-        // cloudLabel
-        // -1, plane points(not ground points)
-        //  0, initial value
-        //  1, edge points
-        //  2, ground points
+    // void groundRemoval(){
+    //     groundCloud->clear();
+    //     // cloudLabel
+    //     // -1, plane points(not ground points)
+    //     //  0, initial value
+    //     //  1, edge points
+    //     //  2, ground points
 
-        if(!distance_threshold)
-        {
-          size_t lowerInd, upperInd;
-          float diffX, diffY, diffZ, angle;
-          TicToc t_ground;
-          for (auto j = 0; j < Horizon_SCAN; ++j){
-              for (auto i = 0; i < groundScanInd; ++i){
-                  lowerInd = j + ( i )*Horizon_SCAN;
-                  upperInd = j + (i+1)*Horizon_SCAN;
+    //     if(!distance_threshold)
+    //     {
+    //       size_t lowerInd, upperInd;
+    //       float diffX, diffY, diffZ, angle;
+    //       TicToc t_ground;
+    //       for (auto j = 0; j < Horizon_SCAN; ++j){
+    //           for (auto i = 0; i < groundScanInd; ++i){
+    //               lowerInd = j + ( i )*Horizon_SCAN;
+    //               upperInd = j + (i+1)*Horizon_SCAN;
 
-                  diffX = extractedCloud->points[upperInd].x - extractedCloud->points[lowerInd].x;
-                  diffY = extractedCloud->points[upperInd].y - extractedCloud->points[lowerInd].y;
-                  diffZ = extractedCloud->points[upperInd].z - extractedCloud->points[lowerInd].z;
-                  angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;              
+    //               diffX = extractedCloud->points[upperInd].x - extractedCloud->points[lowerInd].x;
+    //               diffY = extractedCloud->points[upperInd].y - extractedCloud->points[lowerInd].y;
+    //               diffZ = extractedCloud->points[upperInd].z - extractedCloud->points[lowerInd].z;
+    //               angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;              
 
-                  if (abs(angle - sensorMountAngle) <= 10 && extractedCloud->points[lowerInd].z < -0.5){
-                    cloudLabel[lowerInd] = 2;
-                    cloudLabel[upperInd] = 2;
-                    cloudNeighborPicked[lowerInd] = 1;
-                    cloudNeighborPicked[upperInd] = 1;
-                  }
-              }
-          }
-        }
-        else
-        {
-          size_t current_index;
-          float angle, theory_distance, measurement_distance;
-          for(auto i = 0; i <= groundScanInd; ++i)        
-          {
-            for(auto j = 0; j < Horizon_SCAN; ++j)
-            {
-              current_index = j + i * Horizon_SCAN;
-              angle = 75 + i * 2.0;
-              theory_distance = 0.75 * tan(angle * M_PI / 180);
-              measurement_distance = sqrt(extractedCloud->points[current_index].x * extractedCloud->points[current_index].x +
-                      extractedCloud->points[current_index].y * extractedCloud->points[current_index].y);
-                      // extractedCloud->points[current_index].z * extractedCloud->points[current_index].z);
-              if(abs(theory_distance - measurement_distance) <= distance_threshold)
-              {
-                cloudLabel[current_index] = 2;
-                cloudNeighborPicked[current_index] = 1;
-              }
-            }
-          }
-        }
+    //               if (abs(angle - sensorMountAngle) <= 10 && extractedCloud->points[lowerInd].z < -0.5){
+    //                 cloudLabel[lowerInd] = 2;
+    //                 cloudLabel[upperInd] = 2;
+    //                 cloudNeighborPicked[lowerInd] = 1;
+    //                 cloudNeighborPicked[upperInd] = 1;
+    //               }
+    //           }
+    //       }
+    //     }
+    //     else
+    //     {
+    //       size_t current_index;
+    //       float angle, theory_distance, measurement_distance;
+    //       for(auto i = 0; i <= groundScanInd; ++i)        
+    //       {
+    //         for(auto j = 0; j < Horizon_SCAN; ++j)
+    //         {
+    //           current_index = j + i * Horizon_SCAN;
+    //           angle = 75 + i * 2.0;
+    //           theory_distance = 0.75 * tan(angle * M_PI / 180);
+    //           measurement_distance = sqrt(extractedCloud->points[current_index].x * extractedCloud->points[current_index].x +
+    //                   extractedCloud->points[current_index].y * extractedCloud->points[current_index].y);
+    //                   // extractedCloud->points[current_index].z * extractedCloud->points[current_index].z);
+    //           if(abs(theory_distance - measurement_distance) <= distance_threshold)
+    //           {
+    //             cloudLabel[current_index] = 2;
+    //             cloudNeighborPicked[current_index] = 1;
+    //           }
+    //         }
+    //       }
+    //     }
         
-        if (pubGroundPoints.getNumSubscribers() != 0)
-        {
-            for (auto i = 0; i <= groundScanInd; ++i)
-            {
-                for (auto j = 0; j < Horizon_SCAN; ++j)
-                {
-                    auto index = j + i * Horizon_SCAN;
-                    if (cloudLabel[index] == 2)
-                        groundCloud->push_back(extractedCloud->points[index]);
-                }
-            }
-        }
-        //ROS_INFO_STREAM("TIME OF T_G: "<< t_ground.toc() << "\n");
-    }
+    //     if (pubGroundPoints.getNumSubscribers() != 0)
+    //     {
+    //         for (auto i = 0; i <= groundScanInd; ++i)
+    //         {
+    //             for (auto j = 0; j < Horizon_SCAN; ++j)
+    //             {
+    //                 auto index = j + i * Horizon_SCAN;
+    //                 if (cloudLabel[index] == 2)
+    //                     groundCloud->push_back(extractedCloud->points[index]);
+    //             }
+    //         }
+    //     }
+    //     //ROS_INFO_STREAM("TIME OF T_G: "<< t_ground.toc() << "\n");
+    // }
 
 
     /**
@@ -461,7 +461,7 @@ public:
         // 发布角点、面点点云，用于rviz展示
         cloudInfo.cloud_corner  = publishCloud(&pubCornerPoints,  cornerCloud,  cloudHeader.stamp, lidarFrame);
         cloudInfo.cloud_surface = publishCloud(&pubSurfacePoints, surfaceCloud, cloudHeader.stamp, lidarFrame);
-        cloudInfo.cloud_ground = publishCloud(&pubGroundPoints, groundCloud, cloudHeader.stamp, lidarFrame);
+        // cloudInfo.cloud_ground = publishCloud(&pubGroundPoints, groundCloud, cloudHeader.stamp, lidarFrame);
 
         // 发布当前激光帧点云信息，加入了角点、面点点云数据，发布给mapOptimization
         pubLaserCloudInfo.publish(cloudInfo);

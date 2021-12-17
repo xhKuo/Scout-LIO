@@ -68,6 +68,7 @@ extern const int groundScanInd = 7;
 extern const int segmentValidPointNum = 5;
 extern const int segmentValidLineNum = 3;
 extern const float sensorMountAngle = 0.0;
+extern float z_height = 0.0;
 
 class ParamServer
 {
@@ -147,6 +148,7 @@ public:
     // Surrounding map
     float shorterDistThreshold;
     float distance_threshold;
+    float non_ground_pitch_threshold;
     float surroundingkeyframeAddingDistThreshold;     
     float surroundingkeyframeAddingAngleThreshold;     
     float surroundingKeyframeDensity;
@@ -245,6 +247,7 @@ public:
         nh.param<int>("lio_sam/numberOfCores", numberOfCores, 2);
         nh.param<double>("lio_sam/mappingProcessInterval", mappingProcessInterval, 0.15);
 
+        nh.param<float>("lio_sam/non_ground_pitch_threshold", non_ground_pitch_threshold, 0.01);
         nh.param<float>("lio_sam/distance_threshold", distance_threshold, 0.5);
         nh.param<float>("lio_sam/shorterDistThreshold", shorterDistThreshold, 0.1);
         nh.param<float>("lio_sam/surroundingkeyframeAddingDistThreshold", surroundingkeyframeAddingDistThreshold, 1.0);

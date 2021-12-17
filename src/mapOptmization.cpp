@@ -274,7 +274,7 @@ public:
         // 订阅当前激光帧点云信息，来自featureExtraction
         subCloud = nh.subscribe<lio_sam::cloud_info>("lio_sam/feature/cloud_info", 1, &mapOptimization::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
         // 订阅GPS里程计
-        sub_GPS_nav = nh.subscribe<sensor_msgs::NavSatFix>("/fix", 100, &mapOptimization::GPS_callback, this, ros::TransportHints().tcpNoDelay());
+        sub_GPS_nav = nh.subscribe<sensor_msgs::NavSatFix>("/fixz", 100, &mapOptimization::GPS_callback, this, ros::TransportHints().tcpNoDelay());
         subGPS   = nh.subscribe<nav_msgs::Odometry> (gpsTopic, 200, &mapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
         pubGpsOdom  =  nh.advertise<nav_msgs::Odometry> ("lio_sam/gps/odometry", 1);
 
@@ -977,7 +977,7 @@ public:
             if (abs(copy_cloudKeyPoses6D->points[id].time - timeLaserInfoCur) > historyKeyframeSearchTimeDiff &&
                 id < loopKeyCur - 30)
             {
-                ROS_INFO_STREAM("============ less than current frame number 30 =============");
+                ROS_INFO_STREAM("===== loop closure success, less than current frame number 30 =====");
                 loopKeyPre = id;
                 break;
             }
@@ -1972,28 +1972,46 @@ public:
                 transformTobeMapped[1] = pitchMid;
             }
         }
-
         // 更新当前帧位姿的roll, pitch, z坐标；因为是小车，roll、pitch是相对稳定的，不会有很大变动，一定程度上可以信赖imu的数据，z是进行高度约束
         transformTobeMapped[0] = constraintTransformation(transformTobeMapped[0], rotation_tollerance);
         transformTobeMapped[1] = constraintTransformation(transformTobeMapped[1], rotation_tollerance);
-        transformTobeMapped[5] = constraintTransformation(transformTobeMapped[5], z_tollerance);
+        
+
+        if(std::abs(cloudInfo.imuPitchInit) > non_ground_pitch_threshold)
+        {
+            // 非平面时不设置地面约束
+            z_tollerance = 1000;
+            ROS_INFO_STREAM("========== Not Ground Plane, pitch: " << std::abs(cloudInfo.imuPitchInit) * 180 / M_PI);
+            z_height = transformTobeMapped[5];
+        }
+        else
+        {            
+            z_tollerance = 0.2;
+            transformTobeMapped[5] = constraintTransformation(transformTobeMapped[5], z_tollerance);
+        }
+        ROS_INFO_STREAM("========== =====z_height: " << z_height);
+        ROS_INFO_STREAM("========== z_tollerance: " << z_tollerance);
+        // z_tollerance = std::abs(cloudInfo.imuPitchInit) > non_ground_pitch_threshold ? 1000 : 0.2;
+        // if(z_tollerance > 1)        
+        //     ROS_INFO_STREAM("========== Not Ground Plane, pitch: " << std::abs(cloudInfo.imuPitchInit) * 180 / M_PI);        
 
         // 当前帧位姿
         incrementalOdometryAffineBack = trans2Affine3f(transformTobeMapped);
     }
 
     /**
-     * 值约束
+     * 值约束，不应该是绝对范围，而是相对范围
     */
     float constraintTransformation(float value, float limit)
     {
-        if (value < -limit)
-            value = -limit;
-        if (value > limit)
-            value = limit;
+        if (value < z_height - limit)
+            value = z_height - limit;
+        if (value > z_height + limit)
+            value = z_height + limit;
 
         return value;
     }
+
 
     /**
      * 计算当前帧与前一帧位姿变换，如果变化太小，不设为关键帧，反之设为关键帧
