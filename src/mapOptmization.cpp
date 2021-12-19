@@ -205,6 +205,7 @@ public:
 
     ros::Time timeLaserInfoStamp;
     double timeLaserInfoCur;
+    vector<double> keyPoseTimeStamps;
 
     float transformTobeMapped[6];
 
@@ -274,7 +275,7 @@ public:
         // 订阅当前激光帧点云信息，来自featureExtraction
         subCloud = nh.subscribe<lio_sam::cloud_info>("lio_sam/feature/cloud_info", 1, &mapOptimization::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
         // 订阅GPS里程计
-        sub_GPS_nav = nh.subscribe<sensor_msgs::NavSatFix>("/fixz", 100, &mapOptimization::GPS_callback, this, ros::TransportHints().tcpNoDelay());
+        sub_GPS_nav = nh.subscribe<sensor_msgs::NavSatFix>("/fix", 100, &mapOptimization::GPS_callback, this, ros::TransportHints().tcpNoDelay());
         subGPS   = nh.subscribe<nav_msgs::Odometry> (gpsTopic, 200, &mapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
         pubGpsOdom  =  nh.advertise<nav_msgs::Odometry> ("lio_sam/gps/odometry", 1);
 
@@ -663,7 +664,37 @@ public:
     bool saveMapService(lio_sam::save_mapRequest& req, lio_sam::save_mapResponse& res)
     {
         string saveMapDirectory;
-
+        cout << "****************************************************" << endl;
+        cout << "Saving keyposes to pcd files ..." << endl;
+        if(keyPoseTimeStamps.size() != cloudKeyPoses6D->size())
+        {
+          ROS_ERROR_STREAM("关键帧和时间戳不匹配");
+        }
+        else
+        {
+          for (int i = 0; i < (int)cloudKeyPoses6D->size(); ++i)
+          {
+              ofstream foutC("/home/qigao/output/truth.txt", ios::app);            
+                // 欧拉角转换为四元数，和旋转向量的计算同理
+              Eigen::AngleAxisd rollAngle(Eigen::AngleAxisd(cloudKeyPoses6D->points[i].roll, Eigen::Vector3d::UnitX()));
+              Eigen::AngleAxisd pitchAngle(Eigen::AngleAxisd(cloudKeyPoses6D->points[i].pitch, Eigen::Vector3d::UnitY()));
+              Eigen::AngleAxisd yawAngle(Eigen::AngleAxisd(cloudKeyPoses6D->points[i].yaw, Eigen::Vector3d::UnitZ()));
+              Eigen::Quaterniond tmp_Q;
+              tmp_Q = yawAngle*pitchAngle*rollAngle;
+              foutC.setf(ios::fixed, ios::floatfield);
+              foutC.precision(0);
+              foutC << keyPoseTimeStamps[i] << " ";
+              foutC.precision(5);
+              foutC << cloudKeyPoses6D->points[i].x << " "
+                << cloudKeyPoses6D->points[i].y << " "
+                << cloudKeyPoses6D->points[i].z << " "
+                << tmp_Q.w() << " "
+                << tmp_Q.x() << " "
+                << tmp_Q.y() << " "
+                << tmp_Q.z() << endl;
+              foutC.close();
+          }
+        }
         cout << "****************************************************" << endl;
         cout << "Saving map to pcd files ..." << endl;
         if(req.destination.empty()) saveMapDirectory = std::getenv("HOME") + savePCDDirectory;
@@ -1976,25 +2007,22 @@ public:
         transformTobeMapped[0] = constraintTransformation(transformTobeMapped[0], rotation_tollerance);
         transformTobeMapped[1] = constraintTransformation(transformTobeMapped[1], rotation_tollerance);
         
-
-        if(std::abs(cloudInfo.imuPitchInit) > non_ground_pitch_threshold)
+        if(z_tollerance)
         {
-            // 非平面时不设置地面约束
-            z_tollerance = 1000;
-            ROS_INFO_STREAM("========== Not Ground Plane, pitch: " << std::abs(cloudInfo.imuPitchInit) * 180 / M_PI);
-            z_height = transformTobeMapped[5];
+          if(std::abs(cloudInfo.imuPitchInit) > non_ground_pitch_threshold)
+          {
+              // 非平面时不设置地面约束
+              z_tollerance = 1000;
+              ROS_INFO_STREAM("========== Not Ground Plane, pitch: " << std::abs(cloudInfo.imuPitchInit) * 180 / M_PI);
+              z_height = transformTobeMapped[5];
+          }
+          else
+          {            
+              z_tollerance = 0.2;
+              transformTobeMapped[5] = constraintTransformation(transformTobeMapped[5], z_tollerance);
+          }
         }
-        else
-        {            
-            z_tollerance = 0.2;
-            transformTobeMapped[5] = constraintTransformation(transformTobeMapped[5], z_tollerance);
-        }
-        ROS_INFO_STREAM("========== =====z_height: " << z_height);
         ROS_INFO_STREAM("========== z_tollerance: " << z_tollerance);
-        // z_tollerance = std::abs(cloudInfo.imuPitchInit) > non_ground_pitch_threshold ? 1000 : 0.2;
-        // if(z_tollerance > 1)        
-        //     ROS_INFO_STREAM("========== Not Ground Plane, pitch: " << std::abs(cloudInfo.imuPitchInit) * 180 / M_PI);        
-
         // 当前帧位姿
         incrementalOdometryAffineBack = trans2Affine3f(transformTobeMapped);
     }
@@ -2019,7 +2047,11 @@ public:
     bool saveFrame()
     {
         if (cloudKeyPoses3D->points.empty())
-            return true;
+        {
+          keyPoseTimeStamps.push_back(timeLaserInfoCur);
+          return true;
+        }
+            
 
         // 前一帧位姿
         Eigen::Affine3f transStart = pclPointToAffine3f(cloudKeyPoses6D->back());
@@ -2036,9 +2068,11 @@ public:
             abs(pitch) < surroundingkeyframeAddingAngleThreshold &&
             abs(yaw)   < surroundingkeyframeAddingAngleThreshold &&
             sqrt(x*x + y*y + z*z) < ((initialized_flag_ == false) ? shorterDistThreshold : surroundingkeyframeAddingDistThreshold))
-            {
-              return false;
-            }
+        {
+          return false;
+        }
+
+        keyPoseTimeStamps.push_back(timeLaserInfoCur);
         return true;
     }
 
@@ -2085,8 +2119,8 @@ public:
         } 
         else if(initialized_flag_)
         {
-            if (pointDistance(cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0){
-                ROS_INFO_STREAM("cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0");
+            if (pointDistance(cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 1.0){
+                ROS_INFO_STREAM("cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 1.0");
                 return;
             }
         }
@@ -2150,8 +2184,8 @@ public:
                 curGPSPoint.z = gps_z;
                 // 已经初始化，并且gps间隔较小则不加入优化中
                 if(initialized_flag_){
-                    if (pointDistance(curGPSPoint, lastGPSPoint) < 5.0){
-                        ROS_INFO_STREAM("gps distance is less than 5.0m !!");
+                    if (pointDistance(curGPSPoint, lastGPSPoint) < 1.0){
+                        ROS_INFO_STREAM("gps distance is less than 1.0m !!");
                         continue;
                     }
                     else

@@ -5,11 +5,13 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /links1
+        - /links1/map1
+        - /links1/base_link1
         - /Odometry1
         - /Point Cloud1
         - /Feature Cloud1
-        - /Feature Cloud1/Outlier Feature1
         - /Mapping1
+        - /Mapping1/Map (local)1
       Splitter Ratio: 0.562666654586792
     Tree Height: 683
   - Class: rviz/Selection
@@ -48,16 +50,16 @@ Visualization Manager:
           Value: false
         - Class: rviz/Axes
           Enabled: true
-          Length: 2
+          Length: 5
           Name: map
-          Radius: 0.5
+          Radius: 0.800000011920929
           Reference Frame: map
           Value: true
         - Class: rviz/Axes
           Enabled: true
-          Length: 1
+          Length: 8
           Name: base_link
-          Radius: 0.30000001192092896
+          Radius: 1.2000000476837158
           Reference Frame: base_link
           Value: true
       Enabled: true
@@ -81,7 +83,7 @@ Visualization Manager:
               Scale: 1
               Value: true
             Value: false
-          Enabled: true
+          Enabled: false
           Keep: 30000
           Name: Odom IMU
           Position Tolerance: 0.10000000149011612
@@ -97,7 +99,7 @@ Visualization Manager:
             Value: Axes
           Topic: /odometry/imu
           Unreliable: false
-          Value: true
+          Value: false
         - Angle Tolerance: 0.10000000149011612
           Class: rviz/Odometry
           Covariance:
@@ -246,7 +248,7 @@ Visualization Manager:
           Color: 252; 233; 79
           Color Transformer: FlatColor
           Decay Time: 0
-          Enabled: true
+          Enabled: false
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Max Intensity: 15.100607872009277
@@ -263,7 +265,7 @@ Visualization Manager:
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
-          Value: true
+          Value: false
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -370,7 +372,7 @@ Visualization Manager:
           Color: 255; 255; 255
           Color Transformer: Intensity
           Decay Time: 30000
-          Enabled: true
+          Enabled: false
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Max Intensity: 128
@@ -387,28 +389,28 @@ Visualization Manager:
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
-          Value: true
+          Value: false
         - Alpha: 0.800000011920929
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 10.348546028137207
-            Min Value: -0.9434325098991394
+            Max Value: 30.133129119873047
+            Min Value: -3.1699042320251465
             Value: true
           Axis: Z
           Channel Name: intensity
           Class: rviz/PointCloud2
           Color: 255; 255; 255
           Color Transformer: AxisColor
-          Decay Time: 0
+          Decay Time: 300
           Enabled: true
           Invert Rainbow: false
           Max Color: 255; 255; 255
-          Max Intensity: 15.100604057312012
+          Max Intensity: 227.25
           Min Color: 0; 0; 0
-          Min Intensity: 0.014545874670147896
+          Min Intensity: 1
           Name: Map (local)
           Position Transformer: XYZ
-          Queue Size: 10000
+          Queue Size: 30000
           Selectable: true
           Size (Pixels): 2
           Size (m): 0.10000000149011612
@@ -457,7 +459,7 @@ Visualization Manager:
           Head Length: 0.20000000298023224
           Length: 0.30000001192092896
           Line Style: Billboards
-          Line Width: 0.10000000149011612
+          Line Width: 0.30000001192092896
           Name: Path (global)
           Offset:
             X: 0
@@ -497,8 +499,8 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 25.134754180908203
-            Min Value: -1.2733439207077026
+            Max Value: 10.337318420410156
+            Min Value: -1.053428053855896
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -529,7 +531,8 @@ Visualization Manager:
           Marker Topic: /lio_sam/mapping/loop_closure_constraints
           Name: Loop constraint
           Namespaces:
-            {}
+            loop_edges: true
+            loop_nodes: true
           Queue Size: 100
           Value: true
       Enabled: true
@@ -568,25 +571,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 50.058292388916016
+      Distance: 106.89814758300781
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -3.750155448913574
-        Y: 8.178304672241211
-        Z: 3.9991695880889893
+        X: -32.86188888549805
+        Y: 42.455810546875
+        Z: -9.846288681030273
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.9247974753379822
+      Pitch: 1.4297960996627808
       Target Frame: base_link
       Value: Orbit (rviz)
-      Yaw: 0.26139992475509644
+      Yaw: 0.23140251636505127
     Saved: ~
 Window Geometry:
   Displays:
@@ -594,7 +597,7 @@ Window Geometry:
   Height: 1025
   Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd0000000400000000000001fe000003a7fc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000000a0049006d006100670065000000002e000001340000000000000000fb000000100044006900730070006c006100790073010000003d000003a7000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730000000286000000a70000005c00ffffff000000010000011100000435fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000002e00000435000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004b000000040fc0100000002fb0000000800540069006d00650000000000000004b00000000000000000fb0000000800540069006d0065010000000000000450000000000000000000000539000003a700000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000018e000003a7fc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000000a0049006d006100670065000000002e000001340000000000000000fb000000100044006900730070006c006100790073010000003d000003a7000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730000000286000000a70000005c00ffffff000000010000011100000435fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000002e00000435000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004b000000040fc0100000002fb0000000800540069006d00650000000000000004b00000000000000000fb0000000800540069006d00650100000000000004500000000000000000000005a9000003a700000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Tool Properties:
